@@ -1,0 +1,1144 @@
+<!DOCTYPE html>
+<html lang="tr" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Düşük Hızlı Rüzgar Tüneli Tasarım Analizi & 1D Optimizasyon</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        warmbg: '#fbf9f5',
+                        warmcard: '#ffffff',
+                        stoneborder: '#e7e5e4',
+                        amberaccent: '#d97706',
+                        tealaccent: '#0d9488',
+                        slateprimary: '#1e293b'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Embedded custom CSS for chart container sizing to comply strictly with guidelines */
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 320px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+        .code-block {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #0f172a;
+            color: #38bdf8;
+        }
+    </style>
+</head>
+<!-- Chosen Palette: Warm Neutral & Slate-Amber Balance (Background: warmbg #fbf9f5, Cards: white, Text: Slate-800, Accents: Warm Amber & Deep Teal) -->
+<!-- Application Structure Plan:
+     1. Executive Header & Navigation: Quick access tabs (Genel Bakış & Kuram, Bileşen Derin Analizi, Etkileşimli 1D Hesaplayıcı, MATLAB Kod İyileştirme).
+     2. Tab 1 - Genel Bakış & Aerodinamik Kuramlar: LSWT tanımı, 1D korunum denklemleri, etkileşimli akış devresi şeması (HTML/CSS card grid).
+     3. Tab 2 - Bileşen Derin Analizi & Tasarım Limitleri: Nozzle (Bell-Mehta profili), Test Kesiti (Haaland sürtünme faktörü vs Re & Duvar Açılanması), Difüzör (Statik basınç geri kazanımı Cpr & Stall limitleri), Toplam sistem kaybı & ER.
+     4. Tab 3 - Etkileşimli 1D Hesaplayıcı & Optimizasyon: Canlı girdi parametreleri (V, w, h, L, T, P, CR, 2theta, AR, roughness), anlık aerodinamik hesaplamalar, kayıp dağılımı donat grafiği, güç-hız eğrisi ve otomatik uyarı mekanizmaları.
+     5. Tab 4 - MATLAB Kodu & Revizyon Oluşturucu: Orijinal kod eksiklikleri analizi ve Canlı Hesaplayıcı parametrelerine göre dinamik MATLAB kodu üreteci.
+     Reasoning: Designed to transform static equations into an interactive, step-by-step educational dashboard and analytical optimization tool. -->
+<!-- Visualization & Content Choices:
+     - Circuit Overview -> Interactive HTML Grid with State Highlights -> Enhances visual understanding of energy transformation without SVG.
+     - Bell-Mehta Contour -> Chart.js Line Chart -> Interactive polynomial curve rendering for nozzle geometry.
+     - Friction Factor vs Re -> Chart.js Logarithmic/Line Chart -> Demonstrates Blasius vs Haaland equation differences.
+     - Diffuser Recovery Cpr -> Chart.js Line Chart -> Visualizes Cpr vs Area Ratio (AR) across expansion angles.
+     - Loss Breakdown -> Chart.js Donut Chart -> Directly shows components contributing to total pressure loss.
+     - Power vs Speed -> Chart.js Line Chart with Current Point -> Shows velocity scaling effects on fan power.
+     - Confirmation: NO SVG graphics used. NO Mermaid JS used. HTML/CSS structures and Chart.js Canvas rendering only. -->
+<!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+
+<body class="bg-warmbg text-slateprimary font-sans antialiased min-h-screen flex flex-col">
+
+    <!-- TOP HEADER -->
+    <header class="bg-slateprimary text-white border-b border-slate-700 sticky top-0 z-50 shadow-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div class="flex items-center space-x-3">
+                <span class="text-2xl font-bold tracking-tight text-amberaccent">&#9881; LSWT 1D AeroLab</span>
+                <span class="hidden md:inline-block text-xs bg-slate-700 text-slate-300 px-2.5 py-1 rounded-full">v2.5 Optimizasyon Portalı</span>
+            </div>
+            <!-- Navigation Tabs -->
+            <nav class="flex flex-wrap justify-center gap-1 sm:gap-2 text-sm font-medium">
+                <button id="tab-btn-overview" onclick="switchTab('overview')" class="px-3 py-1.5 rounded-lg bg-amberaccent text-white font-semibold transition shadow-sm">
+                    &#128208; Genel Bakış & Kuram
+                </button>
+                <button id="tab-btn-components" onclick="switchTab('components')" class="px-3 py-1.5 rounded-lg hover:bg-slate-800 text-slate-300 transition">
+                    &#128200; Bileşen Analizleri
+                </button>
+                <button id="tab-btn-calculator" onclick="switchTab('calculator')" class="px-3 py-1.5 rounded-lg hover:bg-slate-800 text-slate-300 transition">
+                    &#9874; Etkileşimli 1D Hesaplayıcı
+                </button>
+                <button id="tab-btn-matlab" onclick="switchTab('matlab')" class="px-3 py-1.5 rounded-lg hover:bg-slate-800 text-slate-300 transition">
+                    &#128187; MATLAB Kod Oluşturucu
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT CONTAINER -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow w-full">
+
+        <!-- ========================================================================= -->
+        <!-- TAB 1: GENEL BAKIŞ VE AERODİNAMİK KURAMLAR -->
+        <!-- ========================================================================= -->
+        <section id="tab-overview" class="space-y-6">
+            <!-- Introduction Header -->
+            <div class="bg-white p-6 rounded-2xl border border-stoneborder shadow-sm">
+                <h1 class="text-2xl sm:text-3xl font-extrabold text-slateprimary mb-3">
+                    Düşük Hızlı Rüzgar Tünellerinde 1D Aerodinamik Tasarım & Optimizasyon Metodolojisi
+                </h1>
+                <p class="text-slate-600 leading-relaxed text-sm sm:text-base">
+                    Düşük hızlı rüzgar tünelleri (<span class="font-semibold text-slate-800">Low-Speed Wind Tunnels - LSWT</span>), Mach sayısının $M < 0.4$ (yaklaşık $V < 134\text{ m/s}$) olduğu, havanın sıkıştırılamaz kabul edildiği aerodinamik test tesisleridir. Alan Pope ve Jewel B. Barlow'un ufuk açıcı çalışmalarında vurgulandığı üzere, tesis boyutlandırması, toplam basınç kayıplarının hesabı ve motor gücü tespiti için bir boyutlu (1D) aerodinamik korunum yasaları ve ampirik literatür sınırları temel alınır.
+                </p>
+            </div>
+
+            <!-- Key Metric Summary Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-white p-4 rounded-xl border border-stoneborder shadow-sm border-l-4 border-l-amberaccent">
+                    <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">Mach Rejimi Sınırı</div>
+                    <div class="text-2xl font-black text-slateprimary my-1">M < 0.3 - 0.4</div>
+                    <p class="text-xs text-slate-500">Sıkıştırılabilirlik etkileri ihmal edilebilir ($\Delta\rho/\rho < 5\%$).</p>
+                </div>
+                <div class="bg-white p-4 rounded-xl border border-stoneborder shadow-sm border-l-4 border-l-tealaccent">
+                    <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">Optimum Daralma (CR)</div>
+                    <div class="text-2xl font-black text-slateprimary my-1">6.0 — 9.0</div>
+                    <p class="text-xs text-slate-500">Türbülans sönümleme ve tesis hacmi dengesi.</p>
+                </div>
+                <div class="bg-white p-4 rounded-xl border border-stoneborder shadow-sm border-l-4 border-l-indigo-600">
+                    <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">Difüzör Açısı ($2\theta$)</div>
+                    <div class="text-2xl font-black text-slateprimary my-1">5° — 7°</div>
+                    <p class="text-xs text-slate-500">Ayrılmasız kararlı akış için eşdeğer koni açısı.</p>
+                </div>
+                <div class="bg-white p-4 rounded-xl border border-stoneborder shadow-sm border-l-4 border-l-emerald-600">
+                    <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">Enerji Oranı (ER)</div>
+                    <div class="text-2xl font-black text-slateprimary my-1">3.0 — 7.0</div>
+                    <p class="text-xs text-slate-500">Kapalı devre tünellerde aerodinamik verimlilik.</p>
+                </div>
+            </div>
+
+            <!-- Interactive Wind Tunnel Circuit Diagram Flow -->
+            <div class="bg-white p-6 rounded-2xl border border-stoneborder shadow-sm">
+                <h2 class="text-lg font-bold text-slateprimary mb-2 flex items-center gap-2">
+                    <span>&#128260;</span> Interactive Rüzgar Tüneli Devre Elemanları
+                </h2>
+                <p class="text-xs sm:text-sm text-slate-500 mb-4">
+                    Aşağıdaki devre elemanlarına tıklayarak her bir bileşenin 1D aerodinamik işlevini ve basınç değişim mekanizmasını inceleyin.
+                </p>
+
+                <!-- Flow Circuit Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-3 text-center">
+                    <div id="circuit-card-settling" onclick="selectCircuitCard('settling')" class="p-4 rounded-xl border-2 border-amberaccent bg-amber-50 cursor-pointer transition hover:shadow-md">
+                        <span class="text-xs font-bold uppercase text-amber-800">1. Dinlenme Odası</span>
+                        <div class="text-base font-extrabold text-slateprimary mt-1">Settling Chamber</div>
+                        <div class="text-xs text-slate-600 mt-2">Düşük hız ($V_{in}$), Yüksek Statik Basınç ($P_{stat}$)</div>
+                    </div>
+                    <div id="circuit-card-nozzle" onclick="selectCircuitCard('nozzle')" class="p-4 rounded-xl border border-stoneborder bg-stone-50 cursor-pointer transition hover:shadow-md">
+                        <span class="text-xs font-bold uppercase text-slate-500">2. Daralma Konisi</span>
+                        <div class="text-base font-extrabold text-slateprimary mt-1">Nozzle Cone</div>
+                        <div class="text-xs text-slate-600 mt-2">İvmelenme, $P_{stat} \to q_{test}$ Dönüşümü</div>
+                    </div>
+                    <div id="circuit-card-test" onclick="selectCircuitCard('test')" class="p-4 rounded-xl border border-stoneborder bg-stone-50 cursor-pointer transition hover:shadow-md">
+                        <span class="text-xs font-bold uppercase text-slate-500">3. Test Kesiti</span>
+                        <div class="text-base font-extrabold text-slateprimary mt-1">Test Section</div>
+                        <div class="text-xs text-slate-600 mt-2">Hedef Hız ($V_{test}$), Duvar Sürtünmesi ($f$)</div>
+                    </div>
+                    <div id="circuit-card-diffuser" onclick="selectCircuitCard('diffuser')" class="p-4 rounded-xl border border-stoneborder bg-stone-50 cursor-pointer transition hover:shadow-md">
+                        <span class="text-xs font-bold uppercase text-slate-500">4. Difüzör & Fan</span>
+                        <div class="text-base font-extrabold text-slateprimary mt-1">Diffuser & Drive</div>
+                        <div class="text-xs text-slate-600 mt-2">Basınç Geri Kazanımı ($C_{pr}$), Güç Takviyesi</div>
+                    </div>
+                </div>
+
+                <!-- Selected Circuit Detail Box -->
+                <div id="circuit-detail-box" class="mt-4 p-4 rounded-xl bg-slate-900 text-slate-100 text-sm leading-relaxed border border-slate-700">
+                    <h3 class="font-bold text-amberaccent text-base mb-1" id="circuit-detail-title">1. Dinlenme Odası (Settling Chamber)</h3>
+                    <p id="circuit-detail-desc">
+                        Akışın düzgünleştirildiği, balpeteği (honeycomb) ve türbülans sönümleyici ince tel ekranların yer aldığı bölümdür. Burada hız en düşük seviyede ($V_{in} = V_{test}/CR$) tutularak ekranlar üzerindeki basınç kayıpları karesel olarak minimize edilir.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Mathematical Foundations Section -->
+            <div class="bg-white p-6 rounded-2xl border border-stoneborder shadow-sm space-y-4">
+                <h2 class="text-lg font-bold text-slateprimary border-b border-stoneborder pb-2">
+                    1D Aerodinamik Korunum Denklemleri & Temel Formülasyonlar
+                </h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+                    <div class="space-y-3 bg-stone-50 p-4 rounded-xl border border-stoneborder">
+                        <h3 class="font-bold text-slateprimary text-base text-amberaccent">Süreklilik ve Bernoulli Denklemi</h3>
+                        <p class="text-slate-600">Sıkıştırılamaz ve sabit yoğunluklu ($\rho = \text{sabit}$) akış varsayımı altında kütlenin korunumu:</p>
+                        <div class="p-2 bg-slate-900 text-amber-300 font-mono text-center rounded">
+                            Q = A_in · V_in = A_test · V_test = A_exit · V_exit
+                        </div>
+                        <p class="text-slate-600">İdeal (sürtünmesiz) akışta mekanik enerjinin korunumu:</p>
+                        <div class="p-2 bg-slate-900 text-teal-300 font-mono text-center rounded">
+                            P_0 = P_stat + (1/2) · ρ · V² = P_stat + q = sabit
+                        </div>
+                    </div>
+
+                    <div class="space-y-3 bg-stone-50 p-4 rounded-xl border border-stoneborder">
+                        <h3 class="font-bold text-slateprimary text-base text-amberaccent">Normalize Kayıp Katsayısı Metodolojisi</h3>
+                        <p class="text-slate-600">Tünelin herhangi bir $i$ bileşenindeki basınç kaybı ($\Delta p_i = K_{local,i} \cdot q_i$), test kesiti dinamik basıncına ($q_{test}$) oranlanır:</p>
+                        <div class="p-2 bg-slate-900 text-amber-300 font-mono text-center rounded">
+                            K_hat_i = K_local,i · (A_test / A_i)²
+                        </div>
+                        <p class="text-slate-600">Toplam sistem kaybı ve Fan Statik Basıncı (FSP):</p>
+                        <div class="p-2 bg-slate-900 text-teal-300 font-mono text-center rounded">
+                            ΔP_total = q_test · Σ K_hat_i  ==>  P_fan = (ΔP_total · Q) / η
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================================================= -->
+        <!-- TAB 2: BİLEŞEN DERİN ANALİZİ VE TASARIM LİMİTLERİ -->
+        <!-- ========================================================================= -->
+        <section id="tab-components" class="hidden space-y-6">
+            <div class="bg-white p-6 rounded-2xl border border-stoneborder shadow-sm">
+                <h1 class="text-xl sm:text-2xl font-extrabold text-slateprimary mb-2">
+                    Rüzgar Tüneli Ana Bileşenlerinin Derinlemesine Tasarım Limitleri
+                </h1>
+                <p class="text-xs sm:text-sm text-slate-600">
+                    Aşağıdaki bölümlerde Nozzle, Test Kesiti, Difüzör ve Enerji Oranı teorilerinin ampirik sınırları, grafiksel karşılaştırmaları ve literatür standartları (Mehta-Bradshaw, Pope, Idelchik, Haaland) detaylandırılmıştır.
+                </p>
+            </div>
+
+            <!-- COMPONENT 1: NOZZLE (CONTRACTION CONE) -->
+            <div class="bg-white p-6 rounded-2xl border border-stoneborder shadow-sm space-y-4">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-stoneborder pb-3">
+                    <div>
+                        <span class="text-xs font-bold text-amberaccent uppercase tracking-wider">Bileşen 1</span>
+                        <h2 class="text-lg font-bold text-slateprimary">Daralma Konisi (Nozzle) Aerodinamiği & Bell-Mehta Profili</h2>
+                    </div>
+                    <span class="text-xs bg-amber-100 text-amber-900 px-3 py-1 rounded-full font-semibold">Tavsiye edilen K_nozzle: 0.02 - 0.05</span>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-center">
+                    <div class="space-y-3 text-sm text-slate-600 leading-relaxed">
+                        <p>
+                            Daralma konisi, akışı ivmelendirerek test kesitine üniform hız profili sağlar. Güçlü lehte basınç gradyanı (favorable pressure gradient) sayesinde sınır tabaka incelir ve eksenel türbülans sönümlenir.
+                        </p>
+                        <div class="bg-stone-50 p-3 rounded-xl border border-stoneborder space-y-1">
+                            <div class="font-bold text-slateprimary">İdeal Statik Basınç Düşüşü Denklemi:</div>
+                            <div class="font-mono text-slate-900 bg-white p-2 rounded border border-stoneborder">
+                                &Delta;P_ideal = P_in - P_out = q_test · (1 - 1/CR²)
+                            </div>
+                        </div>
+                        <p>
+                            <strong>Bell-Mehta 5. Dereceden Polinomu:</strong> Giriş ve çıkış köşelerinde sınır tabaka ayrılmasını (adverse pressure gradient) engellemek için kullanılan standart cidar profilidir ($\xi = x/L$):
+                        </p>
+                        <div class="font-mono text-xs bg-slate-900 text-sky-300 p-2.5 rounded">
+                            y(x) = (H_in - H_out) · [ -6&xi;⁵ + 15&xi;⁴ - 10&xi;³ ] + H_in
+                        </div>
+                        <p class="text-xs text-slate-500">
+                            * Eksenel uzunluk oranı $L / (2 R_i)$ standart olarak $0.75 - 1.25$ aralığında seçilir.
+                        </p>
+                    </div>
+
+                    <!-- Nozzle Contour Chart Container -->
+                    <div class="bg-stone-50 p-4 rounded-xl border border-stoneborder">
+                        <h3 class="text-xs font-bold text-slateprimary mb-2 text-center">Bell-Mehta Polinomik Nozzle Cidar Konturu</h3>
+                        <div class="chart-container">
+                            <canvas id="chartNozzleProfile"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- COMPONENT 2: TEST SECTION & BOUNDARY LAYER -->
+            <div class="bg-white p-6 rounded-2xl border border-stoneborder shadow-sm space-y-4">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-stoneborder pb-3">
+                    <div>
+                        <span class="text-xs font-bold text-tealaccent uppercase tracking-wider">Bileşen 2</span>
+                        <h2 class="text-lg font-bold text-slateprimary">Test Kesiti: Haaland Sürtünme Denklemi & Duvar Açılanması</h2>
+                    </div>
+                    <span class="text-xs bg-teal-100 text-teal-900 px-3 py-1 rounded-full font-semibold">High Re (Re > 10⁵) İçin Haaland Standardı</span>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-center">
+                    <!-- Friction Factor Comparison Chart -->
+                    <div class="bg-stone-50 p-4 rounded-xl border border-stoneborder">
+                        <h3 class="text-xs font-bold text-slateprimary mb-2 text-center">Blasius vs Haaland Sürtünme Katsayısı ($f$) Karşılaştırması</h3>
+                        <div class="chart-container">
+                            <canvas id="chartFrictionCompare"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3 text-sm text-slate-600 leading-relaxed">
+                        <p>
+                            Dikdörtgen kesitli test alanlarında hidrostatik çap $D_h = 4A/P_{wet}$ alınır. Darcy-Weisbach sürtünme kaybı $\Delta P_{test} = f \cdot (L/D_h) \cdot q_{test}$ olarak hesaplanır.
+                        </p>
+                        <div class="bg-stone-50 p-3 rounded-xl border border-stoneborder space-y-1">
+                            <div class="font-bold text-slateprimary">Haaland Denklemi (İterasyonsuz Yüksek Re Formülü):</div>
+                            <div class="font-mono text-xs text-slate-900 bg-white p-2 rounded border border-stoneborder">
+                                1/sqrt(f) = -1.8 · log10 [ ((&epsilon;/D_h)/3.7)^1.11 + 6.9 / Re_Dh ]
+                            </div>
+                        </div>
+                        <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 leading-normal">
+                            <strong>&#9888; Duvar Açılanması (Divergence / Correction):</strong> Duvarlarda büyüyen sınır tabaka deplasman kalınlığı ($\delta^*$), efektif akış alanını daraltarak çekirdek akışın ivmelenmesine ve statik basınç düşüşüne neden olur. Bu durumu (buoyancy drag) kompanse etmek için duvarlara akış yönünde <strong>~0.5° dışa açılanma</strong> verilir.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- COMPONENT 3: DIFFUSER & RECOVERY -->
+            <div class="bg-white p-6 rounded-2xl border border-stoneborder shadow-sm space-y-4">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-stoneborder pb-3">
+                    <div>
+                        <span class="text-xs font-bold text-indigo-600 uppercase tracking-wider">Bileşen 3</span>
+                        <h2 class="text-lg font-bold text-slateprimary">Difüzör Basınç Geri Kazanımı ($C_{pr}$) & Akış Ayrılması Limitleri</h2>
+                    </div>
+                    <span class="text-xs bg-indigo-100 text-indigo-900 px-3 py-1 rounded-full font-semibold">Tavsiye edilen 2&theta;: 5° - 7° | K_diffuser: 0.10 - 0.30</span>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-center">
+                    <div class="space-y-3 text-sm text-slate-600 leading-relaxed">
+                        <p>
+                            Difüzör, yüksek hızlı akışı yavaşlatarak kinetik enerjiyi tekrar statik basınca dönüştürür. Basınç geri kazanım katsayısı ($C_{pr}$) tesisin enerji verimini belirler.
+                        </p>
+                        <div class="bg-stone-50 p-3 rounded-xl border border-stoneborder space-y-1">
+                            <div class="font-bold text-slateprimary">Gerçek & İdeal Basınç Geri Kazanımı:</div>
+                            <div class="font-mono text-xs text-slate-900 bg-white p-2 rounded border border-stoneborder">
+                                C_pr,ideal = 1 - 1/AR²  ==>  K_diffuser = C_pr,ideal - C_pr,real
+                            </div>
+                        </div>
+                        <p>
+                            <strong>Ayrılma (Stall) Riski:</strong> Genişleme açısı arttıkça olumsuz basınç gradyanı ($dp/dx > 0$) etkisiyle cidar ayrılması yaşanır.
+                        </p>
+                        <ul class="list-disc pl-5 text-xs space-y-1 text-slate-700">
+                            <li><strong>2&theta; = 5° - 7°:</strong> İdeal, kararlı, ayrılmasız maksimum basınç geri kazanımı.</li>
+                            <li><strong>2&theta; > 10°:</strong> Masif ayrılma riski; **Collar tel ekranları** ($K_{screen} = K_c \frac{1-\beta}{\beta^2}$) kullanılmalıdır.</li>
+                        </ul>
+                    </div>
+
+                    <!-- Diffuser Recovery Chart Container -->
+                    <div class="bg-stone-50 p-4 rounded-xl border border-stoneborder">
+                        <h3 class="text-xs font-bold text-slateprimary mb-2 text-center">Alan Oranına ($AR$) Bağlı Basınç Geri Kazanım Eğrisi ($C_{pr}$)</h3>
+                        <div class="chart-container">
+                            <canvas id="chartDiffuserRecovery"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- COMPONENT 4: ENERGY RATIO & TUBE LOSSES -->
+            <div class="bg-white p-6 rounded-2xl border border-stoneborder shadow-sm space-y-4">
+                <h2 class="text-lg font-bold text-slateprimary border-b border-stoneborder pb-2">
+                    Wattendorf Enerji Oranı (Energy Ratio - ER) & Tünel Tipleri
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div class="p-4 rounded-xl border border-emerald-200 bg-emerald-50/50 space-y-2">
+                        <span class="text-xs font-bold text-emerald-800 uppercase">Kapalı Devre (Closed-Circuit / Gottingen)</span>
+                        <div class="text-xl font-extrabold text-emerald-950">ER = 3.0 — 7.0</div>
+                        <p class="text-xs text-slate-600 leading-relaxed">
+                            Hava sürekli döngü halindedir. Köşelerdeki yönlendirici kanatçıklar (turning vanes) sayesinde kinetik enerji atmosfere atılmaz. Yüksek enerji verimliliği ve sessiz operasyon sağlar.
+                        </p>
+                    </div>
+
+                    <div class="p-4 rounded-xl border border-amber-200 bg-amber-50/50 space-y-2">
+                        <span class="text-xs font-bold text-amber-800 uppercase">Açık Devre (Open-Circuit / Eiffel)</span>
+                        <div class="text-xl font-extrabold text-amber-950">ER = 0.5 — 1.5</div>
+                        <p class="text-xs text-slate-600 leading-relaxed">
+                            Hava laboratuvardan emilir ve dışarı atılır. Çıkıştaki dinamik basınç tamamen kaybedildiği için ($K_{exit} \approx 1.0$) enerji oranı düşüktür; ancak inşaat maliyeti çok uygundur.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================================================= -->
+        <!-- TAB 3: ETKİLEŞİMLİ 1D HESAPLAYICI VE OPTİMİZASYON ARACI -->
+        <!-- ========================================================================= -->
+        <section id="tab-calculator" class="hidden space-y-6">
+            <div class="bg-white p-6 rounded-2xl border border-stoneborder shadow-sm">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                        <h1 class="text-xl sm:text-2xl font-extrabold text-slateprimary">
+                            Canlı 1D Aerodinamik Solver & Optimizatör
+                        </h1>
+                        <p class="text-xs sm:text-sm text-slate-600">
+                            Aşağıdaki parametreleri değiştirerek rüzgar tünelinizin aerodinamik basınç kayıplarını, fan gücünü ve verimliliğini anlık olarak simüle edin.
+                        </p>
+                    </div>
+                    <button onclick="resetCalculatorDefaults()" class="text-xs bg-stone-200 hover:bg-stone-300 text-slate-800 px-3 py-1.5 rounded-lg font-semibold transition self-start sm:self-auto">
+                        &#8634; Varsayılanlara Dön
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- LEFT COLUMN: CONTROLS (5 Cols) -->
+                <div class="lg:col-span-5 bg-white p-5 rounded-2xl border border-stoneborder shadow-sm space-y-4">
+                    <h2 class="text-base font-bold text-slateprimary border-b border-stoneborder pb-2 flex items-center justify-between">
+                        <span>&#127915; Tasarım Girdileri</span>
+                        <span class="text-xs font-normal text-amberaccent">(SI & CGS Birimler)</span>
+                    </h2>
+
+                    <!-- Test Velocity Slider -->
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-xs font-semibold">
+                            <label for="input-Vtest" class="text-slate-700">Test Hızı ($V_{test}$):</label>
+                            <span id="val-Vtest" class="text-amberaccent font-bold">10.0 m/s</span>
+                        </div>
+                        <input type="range" id="input-Vtest" min="1" max="60" step="0.5" value="10" oninput="run1DSolver()" class="w-full accent-amberaccent">
+                    </div>
+
+                    <!-- Test Section Dimensions -->
+                    <div class="grid grid-cols-3 gap-2">
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-600 mb-0.5">Genişlik (cm)</label>
+                            <input type="number" id="input-w" value="20" min="5" max="200" oninput="run1DSolver()" class="w-full p-1.5 text-xs border border-stoneborder rounded font-bold text-center">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-600 mb-0.5">Yükseklik (cm)</label>
+                            <input type="number" id="input-h" value="20" min="5" max="200" oninput="run1DSolver()" class="w-full p-1.5 text-xs border border-stoneborder rounded font-bold text-center">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-600 mb-0.5">Uzunluk (cm)</label>
+                            <input type="number" id="input-L" value="50" min="10" max="500" oninput="run1DSolver()" class="w-full p-1.5 text-xs border border-stoneborder rounded font-bold text-center">
+                        </div>
+                    </div>
+
+                    <!-- Contraction Ratio Slider -->
+                    <div class="space-y-1 pt-1 border-t border-stone-100">
+                        <div class="flex justify-between text-xs font-semibold">
+                            <label for="input-CR" class="text-slate-700">Daralma Oranı ($CR$):</label>
+                            <span id="val-CR" class="text-tealaccent font-bold">7.0</span>
+                        </div>
+                        <input type="range" id="input-CR" min="3" max="12" step="0.1" value="7.0" oninput="run1DSolver()" class="w-full accent-tealaccent">
+                    </div>
+
+                    <!-- Diffuser Expansion Angle & Area Ratio -->
+                    <div class="grid grid-cols-2 gap-2 pt-1">
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-600 mb-0.5">Difüzör Açısı ($2\theta^\circ$)</label>
+                            <input type="number" id="input-2theta" value="6.0" min="2" max="20" step="0.5" oninput="run1DSolver()" class="w-full p-1.5 text-xs border border-stoneborder rounded font-bold text-center">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-600 mb-0.5">Difüzör $AR$ ($A_{out}/A_{in}$)</label>
+                            <input type="number" id="input-AR" value="2.5" min="1.2" max="5.0" step="0.1" oninput="run1DSolver()" class="w-full p-1.5 text-xs border border-stoneborder rounded font-bold text-center">
+                        </div>
+                    </div>
+
+                    <!-- Ambient Conditions & Roughness -->
+                    <div class="grid grid-cols-3 gap-2 pt-1 border-t border-stone-100">
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-600 mb-0.5">Sıcaklık (°C)</label>
+                            <input type="number" id="input-T" value="-10" min="-50" max="50" oninput="run1DSolver()" class="w-full p-1.5 text-xs border border-stoneborder rounded text-center">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-600 mb-0.5">Basınç (Pa)</label>
+                            <input type="number" id="input-P" value="95000" step="500" oninput="run1DSolver()" class="w-full p-1.5 text-xs border border-stoneborder rounded text-center">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-600 mb-0.5">Pürüzlülük (mm)</label>
+                            <input type="number" id="input-roughness" value="0.015" step="0.005" oninput="run1DSolver()" class="w-full p-1.5 text-xs border border-stoneborder rounded text-center">
+                        </div>
+                    </div>
+
+                    <!-- Fan Efficiency -->
+                    <div class="space-y-1 pt-1">
+                        <div class="flex justify-between text-xs font-semibold">
+                            <label for="input-eta" class="text-slate-700">Fan Verimi ($\eta_{fan}$):</label>
+                            <span id="val-eta" class="text-indigo-600 font-bold">75 %</span>
+                        </div>
+                        <input type="range" id="input-eta" min="40" max="90" step="1" value="75" oninput="run1DSolver()" class="w-full accent-indigo-600">
+                    </div>
+                </div>
+
+                <!-- RIGHT COLUMN: RESULTS & CHARTS (7 Cols) -->
+                <div class="lg:col-span-7 space-y-4">
+                    <!-- Warning & Design Health Badges Container -->
+                    <div id="health-warnings-box" class="space-y-1.5">
+                        <!-- Dynamic badges injected by JS -->
+                    </div>
+
+                    <!-- Primary Solver Numerical Results Grid -->
+                    <div class="bg-white p-5 rounded-2xl border border-stoneborder shadow-sm space-y-3">
+                        <h2 class="text-sm font-bold text-slateprimary border-b border-stoneborder pb-1">
+                            &#128202; Anlık Aerodinamik & Termodinamik Çıktılar
+                        </h2>
+
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                            <div class="p-2.5 bg-stone-50 rounded-xl border border-stoneborder">
+                                <div class="text-[10px] font-bold text-slate-500 uppercase">Hava Yoğunluğu</div>
+                                <div id="res-rho" class="text-base font-black text-slateprimary my-0.5">1.258 kg/m³</div>
+                                <div id="res-mach" class="text-[10px] text-slate-500">Mach: 0.0307</div>
+                            </div>
+                            <div class="p-2.5 bg-stone-50 rounded-xl border border-stoneborder">
+                                <div class="text-[10px] font-bold text-slate-500 uppercase">Dinamik Basınç ($q_{test}$)</div>
+                                <div id="res-qtest" class="text-base font-black text-amberaccent my-0.5">62.9 Pa</div>
+                                <div id="res-re" class="text-[10px] text-slate-500">Re_Dh: 1.54e5</div>
+                            </div>
+                            <div class="p-2.5 bg-stone-50 rounded-xl border border-stoneborder">
+                                <div class="text-[10px] font-bold text-slate-500 uppercase">Sürtünme (Haaland $f$)</div>
+                                <div id="res-f" class="text-base font-black text-tealaccent my-0.5">0.0198</div>
+                                <div id="res-tauw" class="text-[10px] text-slate-500">tau_w: 0.156 Pa</div>
+                            </div>
+                            <div class="p-2.5 bg-slate-900 text-white rounded-xl border border-slate-800">
+                                <div class="text-[10px] font-bold text-amber-400 uppercase">Toplam Dp & Güç</div>
+                                <div id="res-dptotal" class="text-base font-black text-amber-300 my-0.5">15.8 Pa</div>
+                                <div id="res-power" class="text-[10px] text-emerald-400">P_shaft: 0.0084 kW</div>
+                            </div>
+                        </div>
+
+                        <!-- Secondary Detailed Loss breakdown table -->
+                        <div class="grid grid-cols-3 gap-2 text-center text-xs font-mono pt-2 border-t border-stone-100">
+                            <div class="bg-amber-50/50 p-2 rounded">
+                                <span class="text-[10px] text-slate-500 block">Nozzle Loss (K=0.03)</span>
+                                <strong id="res-loss-nozzle" class="text-slate-800">1.89 Pa</strong>
+                            </div>
+                            <div class="bg-teal-50/50 p-2 rounded">
+                                <span class="text-[10px] text-slate-500 block">Test Section Loss</span>
+                                <strong id="res-loss-test" class="text-slate-800">3.11 Pa</strong>
+                            </div>
+                            <div class="bg-indigo-50/50 p-2 rounded">
+                                <span class="text-[10px] text-slate-500 block">Diffuser Loss (K=0.18)</span>
+                                <strong id="res-loss-diffuser" class="text-slate-800">11.32 Pa</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Charts Grid in Calculator -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Loss Breakdown Donut Chart -->
+                        <div class="bg-white p-4 rounded-2xl border border-stoneborder shadow-sm">
+                            <h3 class="text-xs font-bold text-slateprimary mb-2 text-center">&#127829; Basınç Kaybı Bileşen Dağılımı</h3>
+                            <div class="chart-container">
+                                <canvas id="chartLossBreakdown"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Power vs Speed Curve -->
+                        <div class="bg-white p-4 rounded-2xl border border-stoneborder shadow-sm">
+                            <h3 class="text-xs font-bold text-slateprimary mb-2 text-center">&#9889; Hız - Şaft Gücü Eğrisi (kW)</h3>
+                            <div class="chart-container">
+                                <canvas id="chartPowerVsSpeed"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================================================= -->
+        <!-- TAB 4: MATLAB KOD İNCELEMESİ VE REVİZE KOD OLUŞTURUCU -->
+        <!-- ========================================================================= -->
+        <section id="tab-matlab" class="hidden space-y-6">
+            <div class="bg-white p-6 rounded-2xl border border-stoneborder shadow-sm">
+                <h1 class="text-xl sm:text-2xl font-extrabold text-slateprimary mb-2">
+                    MATLAB Kodu Derin Analizi & Dinamik Kod Oluşturucu
+                </h1>
+                <p class="text-xs sm:text-sm text-slate-600">
+                    Orijinal MATLAB kodunuzdaki eksiklikler (NaN bekleyen değişkenler, Blasius sınırlaması) giderilerek, literatür standartlarına tam uyumlu ve **Etkileşimli Hesaplayıcı parametrelerinizle eşzamanlı güncellenen** runnable MATLAB kodu üretilmiştir.
+                </p>
+            </div>
+
+            <!-- Analysis of Original Code vs Improvements -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="bg-amber-50 p-4 rounded-xl border border-amber-200 text-xs text-amber-950 space-y-2">
+                    <h3 class="font-bold text-amber-900 text-sm flex items-center gap-1">
+                        <span>&#9888;</span> Orijinal Koddaki Kritik Eksiklikler
+                    </h3>
+                    <ul class="list-disc pl-4 space-y-1 text-slate-700">
+                        <li><code>K_nozzle</code>, <code>K_diffuser</code> ve <code>f_Darcy</code> değişkenleri <code>NaN</code> bırakıldığı için sistem toplam kayıp hesabı yarıda kalmaktadır.</li>
+                        <li>Sürtünme katsayısı hesabı yalnızca $Re < 10^5$ bölgesinde geçerli Blasius formülünü kullanmaktadır. High Re bölgesinde hata yapar.</li>
+                        <li>Wattendorf Enerji Oranı ($ER$) ve motor şaft gücü ($P_{shaft}$) çıktıları yer almamaktadır.</li>
+                    </ul>
+                </div>
+
+                <div class="bg-emerald-50 p-4 rounded-xl border border-emerald-200 text-xs text-emerald-950 space-y-2">
+                    <h3 class="font-bold text-emerald-900 text-sm flex items-center gap-1">
+                        <span>&#10003;</span> Literatür Bazlı İyileştirmeler (Versiyon 3.0)
+                    </h3>
+                    <ul class="list-disc pl-4 space-y-1 text-slate-700">
+                        <li>NaN kontrol mantığı eklenerek Idelchik/Pope literatür değerleri ($K_{nz}=0.03, K_{df}=0.18$) otomatik atanır.</li>
+                        <li>Yüksek Reynolds rejiminde ($Re > 10^5$) pürüzlülüğü içeren **Haaland açık denklemi** entegre edilmiştir.</li>
+                        <li>Bell-Mehta 5. derece daralma profili ve Wattendorf $ER$ ile kW cinsinden fan gücü hesabı eklenmiştir.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Dynamic MATLAB Code Container -->
+            <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-lg space-y-3">
+                <div class="flex items-center justify-between border-b border-slate-700 pb-2">
+                    <div class="flex items-center space-x-2">
+                        <span class="w-3 h-3 rounded-full bg-red-500 inline-block"></span>
+                        <span class="w-3 h-3 rounded-full bg-yellow-500 inline-block"></span>
+                        <span class="w-3 h-3 rounded-full bg-green-500 inline-block"></span>
+                        <span class="text-xs font-mono text-slate-300 font-bold ml-2">LSWT_1D_Optimization_Generated.m</span>
+                    </div>
+                    <button onclick="copyMatlabCode()" class="text-xs bg-amberaccent hover:bg-amber-600 text-white px-3 py-1 rounded font-semibold transition flex items-center gap-1">
+                        <span>&#128203;</span> Kodu Kopyala
+                    </button>
+                </div>
+
+                <pre id="matlab-code-output" class="code-block p-4 rounded-xl text-xs overflow-x-auto leading-relaxed max-h-[500px]">
+% MATLAB Kodu yükleniyor...
+                </pre>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="bg-slateprimary text-slate-400 text-xs border-t border-slate-800 py-4 mt-8">
+        <div class="max-w-7xl mx-auto px-4 text-center space-y-1">
+            <p>Düşük Hızlı Rüzgar Tüneli Tasarım Analizi & 1D Optimizasyon Metodolojisi Portal | 2026</p>
+            <p class="text-slate-500">Kaynaklar: Alan Pope & Jewel B. Barlow ("Low-Speed Wind Tunnel Testing"), NASA/NACA Technical Reports, Idelchik Handbook, Mehta & Bradshaw (1979).</p>
+        </div>
+    </footer>
+
+    <!-- JAVASCRIPT CORE APPLICATION LOGIC -->
+    <script>
+        // GLOBAL STATE STORE
+        let appState = {
+            currentTab: 'overview',
+            vTest: 10.0,
+            wCm: 20.0,
+            hCm: 20.0,
+            lCm: 50.0,
+            CR: 7.0,
+            twoTheta: 6.0,
+            AR: 2.5,
+            tempC: -10.0,
+            pressPa: 95000.0,
+            roughnessMm: 0.015,
+            etaFanPercent: 75.0,
+            // Calculated outputs
+            rho: 0, mu: 0, aSound: 0, mach: 0, qTest: 0, Re_Dh: 0,
+            fHaaland: 0, tauW: 0, lossNozzle: 0, lossTest: 0, lossDiffuser: 0,
+            totalDp: 0, totalK: 0, ER: 0, powerShaftKw: 0
+        };
+
+        // Chart References
+        let chartNozzleInstance = null;
+        let chartFrictionInstance = null;
+        let chartDiffuserInstance = null;
+        let chartLossInstance = null;
+        let chartPowerInstance = null;
+
+        // INITIALIZATION ON DOM LOAD
+        document.addEventListener('DOMContentLoaded', () => {
+            initComponentCharts();
+            run1DSolver();
+        });
+
+        // TAB SWITCHING SYSTEM
+        function switchTab(tabId) {
+            appState.currentTab = tabId;
+            const tabs = ['overview', 'components', 'calculator', 'matlab'];
+            tabs.forEach(t => {
+                const el = document.getElementById(`tab-${t}`);
+                const btn = document.getElementById(`tab-btn-${t}`);
+                if (t === tabId) {
+                    el.classList.remove('hidden');
+                    btn.className = "px-3 py-1.5 rounded-lg bg-amberaccent text-white font-semibold transition shadow-sm";
+                } else {
+                    el.classList.add('hidden');
+                    btn.className = "px-3 py-1.5 rounded-lg hover:bg-slate-800 text-slate-300 transition";
+                }
+            });
+
+            // Trigger chart resize on tab switch to handle responsive canvas
+            window.dispatchEvent(new Event('resize'));
+        }
+
+        // INTERACTIVE CIRCUIT CARD SELECTION (TAB 1)
+        function selectCircuitCard(cardKey) {
+            const keys = ['settling', 'nozzle', 'test', 'diffuser'];
+            keys.forEach(k => {
+                const card = document.getElementById(`circuit-card-${k}`);
+                if (k === cardKey) {
+                    card.className = "p-4 rounded-xl border-2 border-amberaccent bg-amber-50 cursor-pointer transition hover:shadow-md";
+                } else {
+                    card.className = "p-4 rounded-xl border border-stoneborder bg-stone-50 cursor-pointer transition hover:shadow-md";
+                }
+            });
+
+            const detailTitle = document.getElementById('circuit-detail-title');
+            const detailDesc = document.getElementById('circuit-detail-desc');
+
+            if (cardKey === 'settling') {
+                detailTitle.innerText = "1. Dinlenme Odası (Settling Chamber)";
+                detailDesc.innerText = "Akışın düzgünleştirildiği, balpeteği (honeycomb) ve türbülans sönümleyici ince tel ekranların yer aldığı bölümdür. Burada hız en düşük seviyede (V_in = V_test / CR) tutularak ekranlar üzerindeki basınç kayıpları karesel olarak minimize edilir.";
+            } else if (cardKey === 'nozzle') {
+                detailTitle.innerText = "2. Daralma Konisi (Nozzle Cone)";
+                detailDesc.innerText = "Havanın ivmelendirildiği bölümdür. Statik basınç kinetik enerjiye dönüşür (p_in - p_test = q_test * (1 - 1/CR^2)). Bell-Mehta 5. derece polinom cidar profili kullanılarak giriş ve çıkış köşelerinde ayrılma önlenir. K_nozzle tipik olarak 0.02 - 0.05 aralığındadır.";
+            } else if (cardKey === 'test') {
+                detailTitle.innerText = "3. Test Kesiti (Test Section)";
+                detailDesc.innerText = "Modelin yerleştirildiği ana alandır. Duvar sürtünmesi Darcy-Weisbach denklemi ile hesaplanır. Yüksek Reynolds sayılarında (Re > 10^5) pürüzlülüğü de içeren Haaland formülü esastır. Sınır tabaka büyümesi (~0.5° duvar açılanması ile) kompanse edilir.";
+            } else if (cardKey === 'diffuser') {
+                detailTitle.innerText = "4. Difüzör ve Tahrik Sistemi (Diffuser & Fan)";
+                detailDesc.innerText = "Test kesitinden çıkan yüksek hızlı hava yavaşlatılarak statik basınç geri kazanılır (C_pr). Ayrılmayı önlemek için eşdeğer koni açısı 2θ = 5° - 7° arasında tutulmalıdır. Fan, tüm devre basınç kayıplarını (ΔP_total) yenmek için gerekli gücü sağlar.";
+            }
+        }
+
+        // 1D AERODYNAMIC SOLVER ENGINE
+        function run1DSolver() {
+            // Read inputs from DOM
+            appState.vTest = parseFloat(document.getElementById('input-Vtest').value);
+            appState.wCm = parseFloat(document.getElementById('input-w').value);
+            appState.hCm = parseFloat(document.getElementById('input-h').value);
+            appState.lCm = parseFloat(document.getElementById('input-L').value);
+            appState.CR = parseFloat(document.getElementById('input-CR').value);
+            appState.twoTheta = parseFloat(document.getElementById('input-2theta').value);
+            appState.AR = parseFloat(document.getElementById('input-AR').value);
+            appState.tempC = parseFloat(document.getElementById('input-T').value);
+            appState.pressPa = parseFloat(document.getElementById('input-P').value);
+            appState.roughnessMm = parseFloat(document.getElementById('input-roughness').value);
+            appState.etaFanPercent = parseFloat(document.getElementById('input-eta').value);
+
+            // Synchronize UI Slider Value Labels
+            document.getElementById('val-Vtest').innerText = appState.vTest.toFixed(1) + " m/s";
+            document.getElementById('val-CR').innerText = appState.CR.toFixed(1);
+            document.getElementById('val-eta').innerText = appState.etaFanPercent.toFixed(0) + " %";
+
+            // SI Units
+            const w = appState.wCm / 100.0;
+            const h = appState.hCm / 100.0;
+            const L = appState.lCm / 100.0;
+            const T_K = appState.tempC + 273.15;
+            const R_air = 287.058;
+            const gamma = 1.400;
+
+            // Air Thermodynamics
+            appState.rho = appState.pressPa / (R_air * T_K);
+            const mu_ref = 1.716e-5;
+            const T_ref = 273.15;
+            const S_suth = 110.4;
+            appState.mu = mu_ref * Math.pow(T_K / T_ref, 1.5) * (T_ref + S_suth) / (T_K + S_suth);
+            appState.aSound = Math.sqrt(gamma * R_air * T_K);
+            appState.mach = appState.vTest / appState.aSound;
+
+            // Test Section Aerodynamics
+            const A_test = w * h;
+            const P_wet = 2.0 * (w + h);
+            const Dh = (4.0 * A_test) / P_wet;
+            const Q = A_test * appState.vTest;
+            appState.qTest = 0.5 * appState.rho * Math.pow(appState.vTest, 2);
+            appState.Re_Dh = (appState.rho * appState.vTest * Dh) / appState.mu;
+
+            // Haaland Friction Equation
+            const epsilon_m = appState.roughnessMm / 1000.0;
+            if (appState.Re_Dh < 2300) {
+                appState.fHaaland = 64.0 / appState.Re_Dh;
+            } else {
+                const term1 = Math.pow((epsilon_m / Dh) / 3.7, 1.11);
+                const term2 = 6.9 / appState.Re_Dh;
+                appState.fHaaland = Math.pow(-1.8 * Math.log10(term1 + term2), -2);
+            }
+            appState.tauW = (appState.fHaaland / 8.0) * appState.rho * Math.pow(appState.vTest, 2);
+
+            // Loss Coefficients
+            const K_nozzle = 0.03; // Bell-Mehta standard
+            const K_test_duct = appState.fHaaland * (L / Dh);
+            const K_diffuser = 0.18; // Standard 5-7 deg diffuser
+
+            appState.lossNozzle = K_nozzle * appState.qTest;
+            appState.lossTest = K_test_duct * appState.qTest;
+            appState.lossDiffuser = K_diffuser * appState.qTest;
+
+            appState.totalK = K_nozzle + K_test_duct + K_diffuser;
+            appState.totalDp = appState.totalK * appState.qTest;
+            appState.ER = 1.0 / appState.totalK;
+
+            // Fan Shaft Power
+            const P_ideal_watts = appState.totalDp * Q;
+            const eta_fan = appState.etaFanPercent / 100.0;
+            appState.powerShaftKw = (P_ideal_watts / eta_fan) / 1000.0;
+
+            // Update DOM Numeric Displays
+            document.getElementById('res-rho').innerText = appState.rho.toFixed(3) + " kg/m³";
+            document.getElementById('res-mach').innerText = "Mach: " + appState.mach.toFixed(4);
+            document.getElementById('res-qtest').innerText = appState.qTest.toFixed(1) + " Pa";
+            document.getElementById('res-re').innerText = "Re_Dh: " + appState.Re_Dh.toExponential(2);
+            document.getElementById('res-f').innerText = appState.fHaaland.toFixed(4);
+            document.getElementById('res-tauw').innerText = "tau_w: " + appState.tauW.toFixed(3) + " Pa";
+            document.getElementById('res-dptotal').innerText = appState.totalDp.toFixed(1) + " Pa";
+            document.getElementById('res-power').innerText = "P_shaft: " + appState.powerShaftKw.toFixed(4) + " kW";
+
+            document.getElementById('res-loss-nozzle').innerText = appState.lossNozzle.toFixed(2) + " Pa";
+            document.getElementById('res-loss-test').innerText = appState.lossTest.toFixed(2) + " Pa";
+            document.getElementById('res-loss-diffuser').innerText = appState.lossDiffuser.toFixed(2) + " Pa";
+
+            // Update Dynamic Health Warnings
+            renderHealthWarnings();
+
+            // Update Calculator Charts
+            updateCalculatorCharts();
+
+            // Regenerate MATLAB Code Output
+            generateMatlabCodeOutput();
+        }
+
+        // DESIGN HEALTH & WARNING BADGES
+        function renderHealthWarnings() {
+            const container = document.getElementById('health-warnings-box');
+            let html = "";
+
+            // CR check
+            if (appState.CR < 6.0) {
+                html += `<div class="p-2 bg-amber-100 border-l-4 border-amber-500 text-amber-900 text-xs rounded">
+                    <strong>&#9888; Düşük Daralma Oranı (CR = ${appState.CR.toFixed(1)}):</strong> CR < 6.0 akış homojenliğini bozabilir ve dinlenme odası ekran kayıplarını artırır (Mehta & Bradshaw).
+                </div>`;
+            } else if (appState.CR > 10.0) {
+                html += `<div class="p-2 bg-blue-100 border-l-4 border-blue-500 text-blue-900 text-xs rounded">
+                    <strong>&#128161; Yüksek Daralma Oranı (CR = ${appState.CR.toFixed(1)}):</strong> Mükemmel akış kalitesi sağlar ancak tünel ön kesit hacmini ve inşaat maliyetini artırır.
+                </div>`;
+            } else {
+                html += `<div class="p-2 bg-emerald-100 border-l-4 border-emerald-500 text-emerald-900 text-xs rounded">
+                    <strong>&#10003; Daralma Oranı Optimum (CR = ${appState.CR.toFixed(1)}):</strong> Mehta & Bradshaw (6-10) literatür standartları dahilindedir.
+                </div>`;
+            }
+
+            // Diffuser angle check
+            if (appState.twoTheta > 7.0) {
+                html += `<div class="p-2 bg-red-100 border-l-4 border-red-500 text-red-900 text-xs rounded">
+                    <strong>&#9888; Difüzör Ayrılma Riski (2&theta; = ${appState.twoTheta.toFixed(1)}°):</strong> Eşdeğer açının 7° üzerinde olması duvar ayrılmasına (stall) neden olur. Collar tel ekranları gerekebilir.
+                </div>`;
+            }
+
+            // Mach check
+            if (appState.mach >= 0.3) {
+                html += `<div class="p-2 bg-purple-100 border-l-4 border-purple-500 text-purple-900 text-xs rounded">
+                    <strong>&#9888; Kompresibilite Sınırı (Mach = ${appState.mach.toFixed(3)}):</strong> M >= 0.3 olduğu için izoentropik sıkıştırılabilirlik düzeltmesi (Prandtl-Glauert) uygulanmalıdır.
+                </div>`;
+            }
+
+            container.innerHTML = html;
+        }
+
+        // RESET CALCULATOR TO DEFAULTS
+        function resetCalculatorDefaults() {
+            document.getElementById('input-Vtest').value = 10;
+            document.getElementById('input-w').value = 20;
+            document.getElementById('input-h').value = 20;
+            document.getElementById('input-L').value = 50;
+            document.getElementById('input-CR').value = 7.0;
+            document.getElementById('input-2theta').value = 6.0;
+            document.getElementById('input-AR').value = 2.5;
+            document.getElementById('input-T').value = -10;
+            document.getElementById('input-P').value = 95000;
+            document.getElementById('input-roughness').value = 0.015;
+            document.getElementById('input-eta').value = 75;
+            run1DSolver();
+        }
+
+        // COMPONENT CHARTS INITIALIZATION (TAB 2)
+        function initComponentCharts() {
+            // Chart 1: Bell-Mehta Nozzle Profile
+            const ctxNozzle = document.getElementById('chartNozzleProfile').getContext('2d');
+            const xi = [];
+            const yUpper = [];
+            const yLower = [];
+            const Hin = 0.25; // m
+            const Hout = 0.10; // m
+            for (let i = 0; i <= 20; i++) {
+                const x_ratio = i / 20.0;
+                xi.push(x_ratio.toFixed(2));
+                const poly = -6 * Math.pow(x_ratio, 5) + 15 * Math.pow(x_ratio, 4) - 10 * Math.pow(x_ratio, 3);
+                const y = (Hin - Hout) * poly + Hin;
+                yUpper.push(y * 100); // cm
+                yLower.push(-y * 100); // cm
+            }
+
+            chartNozzleInstance = new Chart(ctxNozzle, {
+                type: 'line',
+                data: {
+                    labels: xi,
+                    datasets: [
+                        { label: 'Üst Cidar (cm)', data: yUpper, borderColor: '#d97706', borderWidth: 2.5, fill: false, pointRadius: 0 },
+                        { label: 'Alt Cidar (cm)', data: yLower, borderColor: '#d97706', borderWidth: 2.5, fill: false, pointRadius: 0 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: true, labels: { font: { size: 10 } } } },
+                    scales: {
+                        x: { title: { display: true, text: 'Boyutsuz Uzunluk (x/L)', font: { size: 10 } } },
+                        y: { title: { display: true, text: 'Yarı Genişlik (cm)', font: { size: 10 } } }
+                    }
+                }
+            });
+
+            // Chart 2: Friction Factor Comparison (Blasius vs Haaland)
+            const ctxFriction = document.getElementById('chartFrictionCompare').getContext('2d');
+            const reLabels = ['1e4', '5e4', '1e5', '5e5', '1e6', '5e6', '1e7'];
+            const reValues = [1e4, 5e4, 1e5, 5e5, 1e6, 5e6, 1e7];
+            const fBlasiusVals = [];
+            const fHaalandVals = [];
+            const Dh_fixed = 0.2; // m
+            const eps_fixed = 0.000015; // m
+
+            reValues.forEach(Re => {
+                let fB = (Re < 1e5) ? 0.316 / Math.pow(Re, 0.25) : 0.184 / Math.pow(Re, 0.20);
+                fBlasiusVals.push(fB);
+
+                const t1 = Math.pow((eps_fixed / Dh_fixed) / 3.7, 1.11);
+                const t2 = 6.9 / Re;
+                const fH = Math.pow(-1.8 * Math.log10(t1 + t2), -2);
+                fHaalandVals.push(fH);
+            });
+
+            chartFrictionInstance = new Chart(ctxFriction, {
+                type: 'line',
+                data: {
+                    labels: reLabels,
+                    datasets: [
+                        { label: 'Blasius Formülü', data: fBlasiusVals, borderColor: '#94a3b8', borderWidth: 2, borderDash: [4, 4] },
+                        { label: 'Haaland Formülü (Endüstri Standardı)', data: fHaalandVals, borderColor: '#0d9488', borderWidth: 2.5 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: true, labels: { font: { size: 10 } } } },
+                    scales: {
+                        x: { title: { display: true, text: 'Reynolds Sayısı (Re)', font: { size: 10 } } },
+                        y: { title: { display: true, text: 'Sürtünme Faktörü (f)', font: { size: 10 } } }
+                    }
+                }
+            });
+
+            // Chart 3: Diffuser Recovery Cpr vs AR
+            const ctxDiffuser = document.getElementById('chartDiffuserRecovery').getContext('2d');
+            const arLabels = ['1.2', '1.5', '2.0', '2.5', '3.0', '3.5', '4.0'];
+            const arValues = [1.2, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0];
+            const cprIdeal = arValues.map(ar => 1.0 - (1.0 / (ar * ar)));
+            const cprReal5deg = cprIdeal.map(c => c - 0.12);
+            const cprReal12deg = cprIdeal.map(c => c - 0.35);
+
+            chartDiffuserInstance = new Chart(ctxDiffuser, {
+                type: 'line',
+                data: {
+                    labels: arLabels,
+                    datasets: [
+                        { label: 'İdeal Cpr (Sürtünmesiz)', data: cprIdeal, borderColor: '#6366f1', borderWidth: 2, borderDash: [3, 3] },
+                        { label: 'Gerçek Cpr (2θ = 6° Ideal)', data: cprReal5deg, borderColor: '#10b981', borderWidth: 2.5 },
+                        { label: 'Gerçek Cpr (2θ = 12° Geniş Açı)', data: cprReal12deg, borderColor: '#ef4444', borderWidth: 2 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: true, labels: { font: { size: 10 } } } },
+                    scales: {
+                        x: { title: { display: true, text: 'Alan Oranı (AR = A_out / A_in)', font: { size: 10 } } },
+                        y: { title: { display: true, text: 'Geri Kazanım Katsayısı (Cpr)', font: { size: 10 } } }
+                    }
+                }
+            });
+        }
+
+        // CALCULATOR CHARTS UPDATE LOGIC
+        function updateCalculatorCharts() {
+            // Donut Chart: Pressure Loss Breakdown
+            const ctxLoss = document.getElementById('chartLossBreakdown').getContext('2d');
+            const lossData = [
+                parseFloat(appState.lossNozzle.toFixed(2)),
+                parseFloat(appState.lossTest.toFixed(2)),
+                parseFloat(appState.lossDiffuser.toFixed(2))
+            ];
+
+            if (chartLossInstance) {
+                chartLossInstance.data.datasets[0].data = lossData;
+                chartLossInstance.update();
+            } else {
+                chartLossInstance = new Chart(ctxLoss, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Nozzle Kaybı', 'Test Kesiti Sürtünmesi', 'Difüzör Kaybı'],
+                        datasets: [{
+                            data: lossData,
+                            backgroundColor: ['#d97706', '#0d9488', '#6366f1'],
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } }
+                    }
+                });
+            }
+
+            // Line Chart: Power vs Speed Curve
+            const ctxPower = document.getElementById('chartPowerVsSpeed').getContext('2d');
+            const vArr = [5, 10, 15, 20, 25, 30, 40, 50];
+            const pKwArr = [];
+
+            const w = appState.wCm / 100.0;
+            const h = appState.hCm / 100.0;
+            const A_test = w * h;
+            const eta_fan = appState.etaFanPercent / 100.0;
+
+            vArr.forEach(v => {
+                const q = 0.5 * appState.rho * Math.pow(v, 2);
+                const dp = appState.totalK * q;
+                const Q = A_test * v;
+                const pKw = ((dp * Q) / eta_fan) / 1000.0;
+                pKwArr.push(parseFloat(pKw.toFixed(4)));
+            });
+
+            if (chartPowerInstance) {
+                chartPowerInstance.data.datasets[0].data = pKwArr;
+                chartPowerInstance.update();
+            } else {
+                chartPowerInstance = new Chart(ctxPower, {
+                    type: 'line',
+                    data: {
+                        labels: vArr.map(v => v + ' m/s'),
+                        datasets: [{
+                            label: 'Şaft Gücü (kW)',
+                            data: pKwArr,
+                            borderColor: '#d97706',
+                            backgroundColor: 'rgba(217, 119, 6, 0.1)',
+                            borderWidth: 2.5,
+                            fill: true,
+                            tension: 0.3
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { title: { display: true, text: 'Hız V (m/s)', font: { size: 10 } } },
+                            y: { title: { display: true, text: 'Güç (kW)', font: { size: 10 } } }
+                        }
+                    }
+                });
+            }
+        }
+
+        // DYNAMIC MATLAB CODE GENERATOR
+        function generateMatlabCodeOutput() {
+            const code = `% =========================================================================
+% BUZLANMA VE DÜŞÜK HIZLI RÜZGAR TÜNELİ 1D OPTİMİZASYON KODU (v3.0)
+% Literatür Standartları: Pope, Barlow, Idelchik, Haaland & Bell-Mehta
+% Otomatik Oluşturulma Tarihi: 2026-09-29
+% =========================================================================
+
+clear; clc; format shortG;
+
+%% 1. GİRDİ PARAMETRELERİ (SI & CGS Otomatik Dönüşüm)
+test_w_cm = ${appState.wCm.toFixed(1)};       % Test Kesiti Genişlik [cm]
+test_h_cm = ${appState.hCm.toFixed(1)};       % Test Kesiti Yükseklik [cm]
+test_L_cm = ${appState.lCm.toFixed(1)};       % Test Kesiti Uzunluk   [cm]
+
+V_test   = ${appState.vTest.toFixed(1)};        % Hedef Test Hızı [m/s]
+T_degC   = ${appState.tempC.toFixed(1)};       % Statik Sıcaklık [°C]
+P_stat   = ${appState.pressPa.toFixed(0)};     % Statik Basınç [Pa]
+
+CR_target   = ${appState.CR.toFixed(1)};       % Hedef Daralma Oranı [-]
+two_theta   = ${appState.twoTheta.toFixed(1)};       % Difüzör Eşdeğer Koni Açısı [deg]
+roughness_m = ${(appState.roughnessMm / 1000.0).toFixed(6)};  % Cidar Pürüzlülüğü [m]
+eta_fan     = ${(appState.etaFanPercent / 100.0).toFixed(2)};      % Fan Aerodinamik Verimi [-]
+
+% Opsiyonel Kayıp Katsayıları (NaN bırakılırsa literatür değerleri otomatik atanır)
+K_nozzle   = NaN; 
+K_diffuser = NaN;
+f_Darcy    = NaN;
+
+%% 2. BİRİM DÖNÜŞÜMLERİ & GEOMETRİ
+cm2m = 0.01;
+w_test = test_w_cm * cm2m; h_test = test_h_cm * cm2m; L_test = test_L_cm * cm2m;
+
+A_test = w_test * h_test;
+P_wet  = 2 * (w_test + h_test);
+Dh     = 4 * A_test / P_wet;
+Q      = A_test * V_test;
+
+%% 3. HAVA ÖZELLİKLERİ & SUTHERLAND VİSKOZİTE
+R_air = 287.058; gamma = 1.400; T_K = T_degC + 273.15;
+rho   = P_stat / (R_air * T_K);
+
+mu_ref = 1.716e-5; T_ref = 273.15; S_suth = 110.4;
+mu = mu_ref * (T_K/T_ref)^1.5 * (T_ref + S_suth)/(T_K + S_suth);
+a_sound = sqrt(gamma * R_air * T_K);
+Mach = V_test / a_sound;
+q_test = 0.5 * rho * V_test^2;
+Re_Dh = rho * V_test * Dh / mu;
+
+%% 4. LİTERATÜR BAZLI NAN KONTROL VE ATAMALAR
+if isnan(K_nozzle)
+    K_nozzle = 0.03; % Bell-Mehta profili Idelchik standardı
+end
+if isnan(K_diffuser)
+    K_diffuser = 0.18; % 5-7 derece ayrılmasız difüzör standardı
+end
+
+%% 5. HAALAND SÜRTÜNME DENKLEMİ (YÜKSEK REYNOLDS)
+if Re_Dh < 2300
+    f_calc = 64 / Re_Dh;
+else
+    term1 = ((roughness_m / Dh) / 3.7)^1.11;
+    term2 = 6.9 / Re_Dh;
+    f_calc = (-1.8 * log10(term1 + term2))^-2;
+end
+if isnan(f_Darcy); f_Darcy = f_calc; end
+
+%% 6. TOPLAM BASINÇ KAYBI VE ENERJİ ORANI (ER) HESABI
+K_test_duct = f_Darcy * (L_test / Dh);
+total_K = K_nozzle + K_test_duct + K_diffuser;
+total_Dp = total_K * q_test;
+
+P_ideal_W = total_Dp * Q;
+P_shaft_kW = (P_ideal_W / eta_fan) / 1000;
+ER = 1 / total_K;
+
+%% 7. SONUÇ RAPORU
+fprintf('\\n================== 1D AERO HESAP SONUÇLARI ==================\\n');
+fprintf('  Hava Yoğunluğu (rho)    : %8.4f kg/m3\\n', rho);
+fprintf('  Dinamik Basınç (q_test) : %8.2f Pa\\n', q_test);
+fprintf('  Reynolds Sayısı (Re_Dh) : %8.2e [-]\\n', Re_Dh);
+fprintf('  Haaland Sürtünme (f)    : %8.4f [-]\\n', f_Darcy);
+fprintf('  --------------------------------------------------------\\n');
+fprintf('  Nozzle Kaybı            : %8.2f Pa (K=%.3f)\\n', K_nozzle*q_test, K_nozzle);
+fprintf('  Test Kesiti Kaybı       : %8.2f Pa (K=%.4f)\\n', K_test_duct*q_test, K_test_duct);
+fprintf('  Difüzör Kaybı           : %8.2f Pa (K=%.3f)\\n', K_diffuser*q_test, K_diffuser);
+fprintf('  --------------------------------------------------------\\n');
+fprintf('  Toplam Dp Kaybı         : %8.2f Pa (K_top=%.4f)\\n', total_Dp, total_K);
+fprintf('  Enerji Oranı (ER)       : %8.2f \\n', ER);
+fprintf('  Gerekli Şaft Gücü       : %8.4f kW (Verim=%%%.0f)\\n', P_shaft_kW, eta_fan*100);
+fprintf('=============================================================\\n');`;
+
+            document.getElementById('matlab-code-output').innerText = code;
+        }
+
+        // COPY MATLAB CODE TO CLIPBOARD
+        function copyMatlabCode() {
+            const codeText = document.getElementById('matlab-code-output').innerText;
+            navigator.clipboard.writeText(codeText).then(() => {
+                alert("MATLAB kodu başarıyla panoya kopyalandı!");
+            }).catch(err => {
+                alert("Kopyalama başarısız oldu: " + err);
+            });
+        }
+    </script>
+</body>
+</html>
