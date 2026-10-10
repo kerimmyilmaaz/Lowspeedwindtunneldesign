@@ -625,13 +625,13 @@ clear; clc; format shortG;
 % --- Test Kesiti [cm] ---
 test_w_cm = 20.0;
 test_h_cm = 20.0;
-test_L_cm = 50.0;
+test_L_cm = 60.0;
 
 % --- Nozzle (Daralma Konisi) ---
 % Giris Kare 50x50, Cikis Kare 20x20
 nozzle_in_w_cm    = 50.0;    % Giris genisligi [cm]
 nozzle_in_h_cm    = 50.0;    % Giris yuksekligi [cm]
-L_nozzle_horiz_cm = 20.0;    % Eksenel daralma uzunlugu [cm]
+L_nozzle_horiz_cm = 25.0;    % Eksenel daralma uzunlugu [cm]
 
 % --- Difuzor ---
 % Giris Kare 20x20, Cikis Dairesel
@@ -1170,10 +1170,10 @@ const FIELDS=[
  {k:'Kmesh',g:'set',label:'Mesh loss factor',unit:'–',def:1.3,m:'K_mesh'},
  {k:'nw',g:'noz',label:'Inlet width',unit:'cm',def:50,m:'nozzle_in_w_cm'},
  {k:'nh',g:'noz',label:'Inlet height',unit:'cm',def:50,m:'nozzle_in_h_cm'},
- {k:'Ln',g:'noz',label:'Axial length',unit:'cm',def:20,m:'L_nozzle_horiz_cm'},
+ {k:'Ln',g:'noz',label:'Axial length',unit:'cm',def:25,m:'L_nozzle_horiz_cm'},
  {k:'tw',g:'test',label:'Width W',unit:'cm',def:20,m:'test_w_cm'},
  {k:'th',g:'test',label:'Height H',unit:'cm',def:20,m:'test_h_cm'},
- {k:'tL',g:'test',label:'Length L',unit:'cm',def:50,m:'test_L_cm'},
+ {k:'tL',g:'test',label:'Length L',unit:'cm',def:60,m:'test_L_cm'},
  {k:'Cd',g:'test',label:'Profile drag coefficient C_d',hint:'NACA 0012 ≈ 0.03–0.05',unit:'–',def:0.04,m:'Cd_model'},
  {k:'chord',g:'test',label:'Model chord c',unit:'cm',def:15,manual:true},
  {k:'Ld',g:'diff',label:'Axial length',unit:'cm',def:178,m:'L_diffuser_cm'},
@@ -1251,7 +1251,7 @@ function validate(p){
 }
 
 /* ================= state ================= */
-const LS='smokeline.v2';
+const LS='smokeline.v3';
 let P=defaults();
 try{ const s=JSON.parse(localStorage.getItem(LS)||'null'); if(s&&typeof s==='object'){ for(const k in P){ if(k in s) P[k]=s[k]; } } }catch(_){}
 function save(){ try{ localStorage.setItem(LS,JSON.stringify(P)); }catch(_){} }
