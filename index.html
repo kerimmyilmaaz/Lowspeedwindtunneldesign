@@ -1,3 +1,8 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Smokeline</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -150,6 +155,8 @@ html.has-cur .tip{display:none}
 .chip.warn{border-color:rgba(242,176,76,.45)} .chip.bad{border-color:rgba(255,122,107,.55)}
 .errbox{margin-top:14px;border:1px solid var(--bad);border-radius:8px;padding:10px 14px;color:var(--bad);background:rgba(255,122,107,.08);font-size:14px}
 .errbox ul{margin:4px 0 0;padding-left:18px}
+#errGeo .errbox{margin:0 0 14px}
+body.stale #readouts,body.stale #checks,body.stale #loss .budget,body.stale #nb,body.stale #sweep .ch,body.stale #stab,body.stale #codePre,body.stale #flyCards{opacity:.35;filter:grayscale(1);transition:opacity .2s}
 .ticker{margin-top:26px;border-top:1px solid var(--h-line);overflow:hidden;white-space:nowrap;font-family:var(--f-mono);font-size:12.5px;color:var(--h-muted);padding:13px 0}
 .ticker .track{display:inline-flex;animation:tick 60s linear infinite}
 .ticker .track span{padding-right:2.2em}
@@ -510,6 +517,7 @@ input[type=range]::-moz-range-thumb{width:12px;height:24px;border-radius:4px;bac
     <div class="geo-wrap">
       <div class="bp rv" id="bp"><div id="bpSvg"></div><div class="bp-cap"><span>Side elevation and end view · dimensions in cm · true scale</span><span>settling chamber length schematic</span></div></div>
       <div>
+        <div id="errGeo"></div>
         <div class="geo" id="geo"></div>
         <div class="geo-foot">
           <button class="btn" id="btnReset" type="button">Restore project values</button>
@@ -831,7 +839,7 @@ fprintf('  Re_kord                : %8.0f  [-]  (c = %.2f cm)\n', Re_c, model_ch
 %% -------------------------------------------------------------------------
 %  Giris: KARE  A_in = W_in * H_in
 %  Cikis: KARE  A_out = A_test
-%  Wattendorf: K_nozzle = f_avg * (L/Dh_in) * 0.32
+%  Wattendorf: K_nozzle = f_avg * (L/Dh_out) * 0.32   (Dh_out = test kesiti Dh)
 
 A_in      = nozzle_in_w * nozzle_in_h;
 P_in      = 2*(nozzle_in_w + nozzle_in_h);
@@ -1160,7 +1168,7 @@ const FIELDS=[
  {k:'T',g:'op',label:'Static temperature',unit:'°C',def:20},
  {k:'P',g:'op',label:'Static pressure',unit:'Pa',def:101325},
  {k:'eta',g:'op',label:'Fan efficiency η',unit:'–',def:0.75,m:'fan_verimi'},
- {k:'fD',g:'op',label:'Darcy f',hint:'leave empty for Prandtl Eq. 3.14',unit:'–',def:'',m:'f_Darcy',opt:true},
+ {k:'fD',g:'op',label:'Darcy f',hint:'test section only (nozzle and diffuser always use Haaland); leave empty for Prandtl Eq. 3.14',unit:'–',def:'',m:'f_Darcy',opt:true},
  {k:'LhDh',g:'set',label:'Honeycomb L/D',unit:'–',def:6,m:'Lh_Dh'},
  {k:'betah',g:'set',label:'Honeycomb porosity β',unit:'–',def:0.8,m:'beta_h'},
  {k:'lamh',g:'set',label:'Wall friction coefficient λ',unit:'–',def:0.004,m:'lambda_h'},
@@ -1243,6 +1251,8 @@ function validate(p){
   if(p.fD!==''&&!(isFinite(p.fD)&&p.fD>0)) e.push('Darcy f must be positive, or leave it empty.');
   if(p.mode==='manual') pos('chord','Model chord');
   if(!e.length){
+    if(p.P<30000||p.P>150000) e.push('Static pressure must be in Pa (30 000–150 000). Type it without thousands separators, e.g. 101325, not 101.325.');
+    if(p.T<-60||p.T>80) e.push('Static temperature looks off: expected −60…80 °C.');
     if(p.dw>=p.wm) e.push('Wire diameter must be smaller than the mesh width.');
     if(Math.PI*(p.Dd/2)**2<=p.tw*p.th) e.push('Diffuser outlet area must exceed the test section area (AR > 1).');
     if(p.nw*p.nh<=p.tw*p.th) e.push('Contraction inlet area must exceed the test section area (CR > 1).');
@@ -1253,7 +1263,10 @@ function validate(p){
 /* ================= state ================= */
 const LS='smokeline.v3';
 let P=defaults();
-try{ const s=JSON.parse(localStorage.getItem(LS)||'null'); if(s&&typeof s==='object'){ for(const k in P){ if(k in s) P[k]=s[k]; } } }catch(_){}
+try{ const s=JSON.parse(localStorage.getItem(LS)||'null'); if(s&&typeof s==='object'){ for(const k in P){ if(!(k in s)) continue; const v=s[k];
+  if(k==='mode'){ if(v==='auto'||v==='manual') P.mode=v; }
+  else if(typeof v==='number'&&isFinite(v)) P[k]=v;
+  else if(k==='fD'&&v==='') P[k]=''; } } }catch(_){}
 function save(){ try{ localStorage.setItem(LS,JSON.stringify(P)); }catch(_){} }
 let R=null, TG=null;
 
@@ -2164,13 +2177,15 @@ function canvasClick(v){ return e=>{ const h=probe(v,e.clientX,e.clientY); if(h)
 /* ================= footer wordmark ================= */
 const BM=$('#bigmark');
 'SMOKELINE'.split('').forEach((ch,i)=>{ const s=document.createElement('span'); s.textContent=ch; if(i>=5) s.className='o'; BM.appendChild(s); });
-const BMS=[...BM.children]; let bmVisible=false;
+const BMS=[...BM.children]; let bmVisible=false, bmCx=null;
+function measureBigmark(){ const b=BM.getBoundingClientRect(); bmCx=BMS.map(s=>{ const r=s.getBoundingClientRect(); return r.left+r.width/2-b.left; }); }
 if('IntersectionObserver' in window) new IntersectionObserver(es=>{ bmVisible=es[0].isIntersecting; },{}).observe(BM);
 function updateBigmark(now){
   if(!bmVisible||RM.matches) return;
   const b=BM.getBoundingClientRect(); let cx;
   if(CUR&&my>b.top-200&&my<b.bottom+200&&mx>0) cx=mx; else cx=b.left+b.width*(0.5+0.5*Math.sin(now/1400));
-  BMS.forEach(s=>{ const r=s.getBoundingClientRect(); const d=Math.abs(r.left+r.width/2-cx)/Math.max(120,b.width*0.18); const k=Math.exp(-d*d);
+  if(!bmCx) measureBigmark();
+  BMS.forEach((s,i)=>{ const d=Math.abs(b.left+bmCx[i]-cx)/Math.max(120,b.width*0.18); const k=Math.exp(-d*d);
     s.style.fontStretch=(78+47*k).toFixed(1)+'%'; s.style.fontWeight=String(Math.round(500+400*k)); });
 }
 
@@ -2205,8 +2220,12 @@ function schedule(){ if(pend) return; pend=true; requestAnimationFrame(()=>{ pen
 function update(){
   const errs=validate(P);
   const eh=$('#errHero');
-  if(errs.length){ eh.innerHTML='<div class="errbox" role="alert"><b>Calculation paused. Fix the input:</b><ul>'+errs.map(e=>'<li>'+e+'</li>').join('')+'</ul></div>'; return; }
-  eh.innerHTML='';
+  const eg=$('#errGeo');
+  if(errs.length){ const list='<ul>'+errs.map(e=>'<li>'+e+'</li>').join('')+'</ul>';
+    eh.innerHTML='<div class="errbox" role="alert"><b>Calculation paused. Fix the input:</b>'+list+'</div>';
+    eg.innerHTML='<div class="errbox"><b>Calculation paused. The results on this page are out of date until you fix:</b>'+list+'</div>';
+    document.body.classList.add('stale'); return; }
+  eh.innerHTML=''; eg.innerHTML=''; document.body.classList.remove('stale');
   R=compute(P); save();
   renderHero(R); renderBudget(R); renderNb(R); renderFlyCards(R);
   const g=JSON.stringify([P.nw,P.nh,P.Ln,P.tw,P.th,P.tL,P.Ld,P.Dd,P.N,P.mode,P.chord]);
@@ -2223,7 +2242,7 @@ $('#btnReset').addEventListener('click',()=>{ P=defaults(); syncInputs(); FIELDS
 
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{ if(R) renderSweep(R); });
 new MutationObserver(()=>{ if(R) renderSweep(R); }).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
-let rw=0, rh=0; new ResizeObserver(()=>{ const w=innerWidth, h=innerHeight; measureDock(); if(w!==rw||Math.abs(h-rh)>120){ rw=w; rh=h; if(TG){ layoutHero(); layoutFly(); } if(R){ renderSweep(R); blueprint(); } lastScroll=-1; } }).observe(document.body);
+let rw=0, rh=0; new ResizeObserver(()=>{ const w=innerWidth, h=innerHeight; measureDock(); bmCx=null; if(w!==rw||Math.abs(h-rh)>120){ rw=w; rh=h; if(TG){ layoutHero(); layoutFly(); } if(R){ renderSweep(R); blueprint(); } lastScroll=-1; } }).observe(document.body);
 
 /* ================= boot ================= */
 readTheme();
@@ -2233,8 +2252,8 @@ HV.cvT.addEventListener('click',canvasClick(HV));
 FV.cvT.addEventListener('click',canvasClick(FV));
 buildGeo(); syncInputs(); measureDock(); update();
 setupReveals();
-renderSweep(R); renderMatlab(); blueprint();
+if(R){ renderSweep(R); renderMatlab(); blueprint(); }
 requestAnimationFrame(loop);
-if(document.fonts&&document.fonts.ready) document.fonts.ready.then(()=>{ measureDock(); if(TG){ layoutHero(); layoutFly(); } });
+if(document.fonts&&document.fonts.ready) document.fonts.ready.then(()=>{ measureDock(); bmCx=null; if(TG){ layoutHero(); layoutFly(); } });
 })();
 </script>
