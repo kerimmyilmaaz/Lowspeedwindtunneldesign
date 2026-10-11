@@ -1,4 +1,38 @@
-<title>Smokeline</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wind Tunnel Computation Sheet | Smokeline – Low-Speed Wind Tunnel Design Calculator</title>
+<meta name="description" content="Smokeline is a free, interactive wind tunnel computation sheet for low-speed, open-circuit wind tunnels: size the settling chamber, nozzle, test section and diffuser, compute the pressure loss budget and fan power (Barlow, Rae &amp; Pope), and export to MATLAB.">
+<meta name="keywords" content="wind tunnel computation sheet, wind tunnel calculator, wind tunnel design, low-speed wind tunnel, open circuit wind tunnel, pressure loss, Smokeline">
+<link rel="canonical" href="https://windtunnel-theta.vercel.app/">
+<meta name="robots" content="index, follow">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Smokeline">
+<meta property="og:title" content="Wind Tunnel Computation Sheet | Smokeline">
+<meta property="og:description" content="Interactive computation sheet for low-speed, open-circuit wind tunnel design: geometry, loss budget, speed sweep and MATLAB export.">
+<meta property="og:url" content="https://windtunnel-theta.vercel.app/">
+<meta name="twitter:card" content="summary">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "name": "Smokeline",
+      "alternateName": ["Smokeline Wind Tunnel", "Smokline", "Wind Tunnel Computation Sheet"],
+      "url": "https://windtunnel-theta.vercel.app/"
+    },
+    {
+      "@type": "WebApplication",
+      "name": "Smokeline – Wind Tunnel Computation Sheet",
+      "url": "https://windtunnel-theta.vercel.app/",
+      "applicationCategory": "EngineeringApplication",
+      "operatingSystem": "Any (web browser)",
+      "description": "Interactive computation sheet for sizing a low-speed, open-circuit wind tunnel and computing its component pressure losses and fan power.",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+    }
+  ]
+}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
@@ -443,7 +477,7 @@ input[type=range]::-moz-range-thumb{width:12px;height:24px;border-radius:4px;bac
     </header>
     <div class="hero-head" id="heroHead">
       <h1 id="h1"><span class="w-in">Contract.</span><span class="w-ex">Accelerate.</span><span class="w-mid">Read the loss.</span></h1>
-      <p class="lede">A live design sheet for a <b>low-speed, open-circuit wind tunnel</b>. Enter your geometry and drag the throttle. Smoke filaments speed up and slow down as continuity dictates, and every component loss is recomputed from the Barlow, Rae &amp; Pope (1999) relations. Scroll on to fly through the tunnel.</p>
+      <p class="lede">A live <b>wind tunnel computation sheet</b> for a <b>low-speed, open-circuit wind tunnel</b>. Enter your geometry and drag the throttle. Smoke filaments speed up and slow down as continuity dictates, and every component loss is recomputed from the Barlow, Rae &amp; Pope (1999) relations. Scroll on to fly through the tunnel.</p>
     </div>
     <div class="tunnel" id="tunnel">
       <canvas class="cvB" aria-hidden="true"></canvas>
