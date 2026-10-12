@@ -28,6 +28,12 @@
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Any (web browser)",
       "description": "Interactive computation sheet for sizing a low-speed, open-circuit wind tunnel and computing its component pressure losses and fan power.",
+      "author": {
+        "@type": "Person",
+        "name": "Kerim Yılmaz",
+        "affiliation": { "@type": "CollegeOrUniversity", "name": "Istanbul Technical University" },
+        "sameAs": ["https://www.linkedin.com/in/kerim-y%C4%B1lmaz-094621216/", "https://github.com/kerimmyilmaaz"]
+      },
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
     }
   ]
@@ -387,7 +393,10 @@ h2{font-family:var(--f-display);font-stretch:118%;font-weight:800;font-size:clam
 .code .chg{background:color-mix(in srgb,var(--accent) 16%,transparent);box-shadow:inset 3px 0 0 var(--accent)}
 .status{font-size:13px;color:var(--ok);min-height:1em}
 
-footer{margin-top:clamp(56px,8vw,96px);padding-top:18px;border-top:1px solid var(--line);font-size:13px;color:var(--muted);display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:18px 40px}
+footer{margin-top:clamp(56px,8vw,96px);padding-top:18px;border-top:1px solid var(--line);font-size:13px;color:var(--muted);display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,.9fr);gap:18px 40px;scroll-margin-top:64px}
+footer .who{color:var(--ink);font-weight:600;margin:0 0 2px}
+footer .clinks{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:6px}
+footer .clinks span{display:inline-block;min-width:72px;font-family:var(--f-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
 footer h4{margin:0 0 6px;font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink);font-weight:600}
 footer ol{margin:0;padding-left:18px}
 footer p{margin:0 0 8px}
@@ -472,7 +481,7 @@ input[type=range]::-moz-range-thumb{width:12px;height:24px;border-radius:4px;bac
     <header class="top">
       <div class="mark"><span class="wm">SMOKE<em>LINE</em></span><span class="ver">OPEN CIRCUIT · CLOSED TEST SECTION · 1D SIZING</span></div>
       <nav class="jump" aria-label="Sections">
-        <a href="#fly" data-go="fly">Fly-through</a><a href="#loss" data-go="loss">Loss budget</a><a href="#geometry" data-go="geometry">Geometry</a><a href="#notebook" data-go="notebook">Notebook</a><a href="#sweep" data-go="sweep">Speed sweep</a><a href="#matlab" data-go="matlab">MATLAB</a>
+        <a href="#fly" data-go="fly">Fly-through</a><a href="#loss" data-go="loss">Loss budget</a><a href="#geometry" data-go="geometry">Geometry</a><a href="#notebook" data-go="notebook">Notebook</a><a href="#sweep" data-go="sweep">Speed sweep</a><a href="#matlab" data-go="matlab">MATLAB</a><a href="#contact">Contact</a>
       </nav>
     </header>
     <div class="hero-head" id="heroHead">
@@ -606,7 +615,21 @@ input[type=range]::-moz-range-thumb{width:12px;height:24px;border-radius:4px;bac
       <p>This is a one-dimensional preliminary design estimate. It does not replace detailed design, CFD or measurement. The calculation logic is identical to the project's <span class="mono">ruzgar_tuneli_hesap.m</span> v5.0.</p>
       <p><a href="https://github.com/kerimmyilmaaz/Lowspeedwindtunneldesign" target="_blank" rel="noopener">Project repository</a></p>
     </div>
+    <div>
+      <h4>Contact</h4>
+      <p class="who">Kerim Yılmaz</p>
+      <p>Istanbul Technical University, Aeronautical Engineering Department</p>
+      <ul class="clinks">
+        <li><span>Email</span><a id="cMail" href="#contact">smokeline.w [at] gmail.com</a></li>
+        <li><span>LinkedIn</span><a href="https://www.linkedin.com/in/kerim-y%C4%B1lmaz-094621216/" target="_blank" rel="noopener me">kerim-yılmaz</a></li>
+        <li><span>GitHub</span><a href="https://github.com/kerimmyilmaaz" target="_blank" rel="noopener me">kerimmyilmaaz</a></li>
+      </ul>
+    </div>
   </footer>
+  <script>
+  /* email is assembled at runtime so scrapers reading the raw HTML don't get it */
+  (function(){var a=document.getElementById('cMail'),u='smokeline.w',d='gmail.com';a.href='mailto:'+u+'@'+d;a.textContent=u+'@'+d;})();
+  </script>
   <div class="bigmark" id="bigmark" aria-hidden="true"></div>
 </div>
 
