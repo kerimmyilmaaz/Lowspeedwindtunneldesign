@@ -588,7 +588,7 @@ input[type=range]::-moz-range-thumb{width:12px;height:24px;border-radius:4px;bac
 
   <section class="blk" id="matlab" aria-labelledby="h-matlab">
     <div class="shead"><div class="secno" aria-hidden="true">.m</div><div>
-      <p class="eyebrow">ruzgar_tuneli_hesap.m · v5.0</p>
+      <p class="eyebrow">ruzgar_tuneli_hesap.m · v5.1</p>
       <h2 id="h-matlab" class="rv split">Export to MATLAB</h2>
       <p class="sub rv" style="--i:2">Your inputs are written into the fixed-parameter lines of the project's MATLAB script. Changed lines are highlighted. Copy it and run it in MATLAB.</p>
     </div></div>
@@ -604,7 +604,8 @@ input[type=range]::-moz-range-thumb{width:12px;height:24px;border-radius:4px;bac
     <div>
       <h4>References</h4>
       <ol>
-        <li>Barlow, J. B., Rae, W. H., Pope, A. (1999). <i>Low-Speed Wind Tunnel Testing</i>, 3rd ed. Wiley. Eq. 3.14, 3.24–3.29, 3.36–3.43; §3.3, §3.5.</li>
+        <li>Barlow, J. B., Rae, W. H., Pope, A. (1999). <i>Low-Speed Wind Tunnel Testing</i>, 3rd ed. Wiley. Eq. 3.14, 3.24–3.27, 3.36–3.43; §3.3, §3.5.</li>
+        <li>Eckert, W. T., Mort, K. W., Jope, J. (1976). <i>Aerodynamic Design Guidelines and Computer Program for Estimation of Subsonic Wind Tunnel Performance</i>. NASA TN D-8243, App. B (diffuser expansion loss K<sub>e</sub>).</li>
         <li>Wattendorf contraction loss relation, as given in Barlow, Rae &amp; Pope.</li>
         <li>Haaland, S. E. (1983). Explicit friction factor approximation, smooth-wall form.</li>
         <li>Sutherland's law for viscosity; Maskell, E. C. (1963), solid blockage criterion.</li>
@@ -612,7 +613,7 @@ input[type=range]::-moz-range-thumb{width:12px;height:24px;border-radius:4px;bac
     </div>
     <div>
       <h4>Scope</h4>
-      <p>This is a one-dimensional preliminary design estimate. It does not replace detailed design, CFD or measurement. The calculation logic is identical to the project's <span class="mono">ruzgar_tuneli_hesap.m</span> v5.0.</p>
+      <p>This is a one-dimensional preliminary design estimate. It does not replace detailed design, CFD or measurement. The calculation logic is identical to the project's <span class="mono">ruzgar_tuneli_hesap.m</span> v5.1.</p>
       <p><a href="https://github.com/kerimmyilmaaz/Lowspeedwindtunneldesign" target="_blank" rel="noopener">Project repository</a></p>
     </div>
     <div>
@@ -650,9 +651,25 @@ input[type=range]::-moz-range-thumb{width:12px;height:24px;border-radius:4px;bac
 % =========================================================================
 %  RUZGAR TUNELI --- 1D ON HESAP TABLOSU
 %  (Ek Toolbox gerekmez | GIRDILER santimetre [cm], hesaplar SI)
-%  Versiyon: 5.0  |  Tarih: 2026-10-03
+%  Versiyon: 5.1  |  Tarih: 2026-10-17
 %  Ref: Barlow, Rae & Pope "Low-Speed Wind Tunnel Testing" (1999)
+%       Eckert, Mort & Jope (1976), Ek B: difuzor genisleme kaybi K_e
+%       (orijinal bagintilar, 2*theta cinsinden)
 % =========================================================================
+%
+%  v5.1 DEGISIKLIKLERI (Bolum 7):
+%   - Kare kesit K_e bagintisi Barlow Eq. 3.29 yerine orijinal kaynaktan
+%     (Eckert vd. B7-B9) alindi. Barlow'daki yazim hatalari:
+%       * theta > 5 derece dogrusal kisim sabit terimi: -0.01322 -> -0.1322
+%       * polinom theta^3 katsayisi isareti, theta^5 katsayisi (isaret ve
+%         basamak), theta^6 katsayisi isareti hatali.
+%     Duzeltilmis bagintilar 3 ve 10 derecede (2*theta) suruklidir.
+%   - Kare -> daire gecisli difuzor icin Eckert vd. B14 uygulandi:
+%       K_EXP = K_temel + (1 - delta_s) * (K_ek - K_temel)
+%     K_temel = (K_kare + K_daire)/2  (3D ortalama),
+%     K_ek    = 2D ortalama,  delta_s = duzlemsellik orani.
+%   - Difuzor surtunme faktoru Barlow'a uygun olarak test kesitindeki gibi
+%     Prandtl (Eq. 3.14) ile, giris Reynolds sayisiyla hesaplanir.
 %
 %  BOLUMLER:
 %   1.  Sabit Girdi Parametreleri (Gercek Tunel Geometrisi)
@@ -662,7 +679,7 @@ input[type=range]::-moz-range-thumb{width:12px;height:24px;border-radius:4px;bac
 %   4.  Hava Ozellikleri
 %   5.  Test Kesiti Hesaplari
 %   6.  Nozzle Geometrisi + Wattendorf K_nozzle
-%   7.  Difuzor Kaybi  (Barlow Eq. 3.24-3.29)
+%   7.  Difuzor Kaybi  (Barlow Eq. 3.24-3.27 + Eckert vd. K_e)
 %   8.  Cikis Atim Kaybi
 %   9.  Dinlenme Odasi Kayiplari (Honeycomb + Ekranlar)
 %  10.  Model Suruklenme Kaybi
@@ -670,6 +687,8 @@ input[type=range]::-moz-range-thumb{width:12px;height:24px;border-radius:4px;bac
 %  12.  Basinc Kaybi Ozet + Fan Guc Tahmini
 %  13.  Hiz Duyarlilik Tablosu
 %  14.  Grafikler
+%  15.  CFD On Hazirlik
+%  --   Yerel fonksiyonlar (K_e bagintilari) dosyanin sonunda
 % =========================================================================
 
 clear; clc; format shortG;
@@ -835,7 +854,7 @@ T_total_K = T_K * (1 + (gamma-1)/2 * Mach^2);
 P_total   = P_stat * (T_total_K / T_K)^(gamma/(gamma-1));
 
 fprintf('\n%s\n', repmat('=',1,60));
-fprintf('   RUZGAR TUNELI --- ON HESAP TABLOSU  (v5.0 - Gercek Geometri)\n');
+fprintf('   RUZGAR TUNELI --- ON HESAP TABLOSU  (v5.1 - Gercek Geometri)\n');
 fprintf('%s\n', repmat('=',1,60));
 fprintf('\n--- HAVA OZELLIKLERI (T=%.1f degC, P=%.0f Pa) ---\n', T_degC, P_stat);
 fprintf('  rho          : %8.4f  kg/m3\n', rho);
@@ -926,46 +945,89 @@ fprintf('  K_nozzle (Wattendorf)  : %8.5f  [-]\n', K_nozzle);
 fprintf('  dP_nozzle              : %8.3f  Pa\n', dp_nozzle);
 
 %% -------------------------------------------------------------------------
-%% 7. DIFUZOR KAYBI  (Barlow, Rae & Pope Eq. 3.24 - 3.29)
+%% 7. DIFUZOR KAYBI  (Barlow Eq. 3.24-3.27 + Eckert vd. orijinal K_e)
 %% -------------------------------------------------------------------------
+%  K_d  = K_f + K_ex                                  (Barlow Eq. 3.25)
+%  K_f  = (1 - 1/AR^2) * f / (8 sin(theta))           (Barlow Eq. 3.26)
+%  K_ex = K_e(2*theta) * ((AR-1)/AR)^2                (Barlow Eq. 3.27)
+%  K_e  : Eckert vd. Ek B (B4-B14), 2*theta [derece] cinsinden.
 
-% Eşdeğer koni acisi (kare -> dairesel gecis, AR tabanli aci)
+% --- Esdeger koni acisi (Barlow Eq. 3.24, AR tabanli ifade) ---
 theta_e_rad = atan(0.5 * (sqrt(AR_diffuser) - 1) / (L_diffuser / Dh_out));
 theta_e_deg = rad2deg(theta_e_rad);
+phi_deg     = 2 * theta_e_deg;          % toplam koni acisi 2*theta [derece]
 
+% --- Surtunme kaybi ---
+% Barlow: f, sabit kesitli bolumdeki gibi (Prandtl Eq. 3.14) GIRIS Re ile.
+% Difuzor girisi = test kesiti cikisi oldugu icin f_diff = f_test.
 Re_diff = Re_out;
-f_diff  = haaland(Re_diff);
+f_diff  = f_test;
 K_f     = (1 - 1/AR_diffuser^2) * f_diff / (8 * sin(theta_e_rad));
 
-% K_e: Barlow Eq. 3.28 DAIRESEL kesit bagintisi.
-% Not: Kare kesit polinomu (Eq. 3.29) 5 derecede ~0.75 -> 0.28 sureksizligi
-% gosterdigi icin kullanilmiyor; difuzor zaten kare->daire gecislidir.
-t = theta_e_deg;
-if t <= 1.5
-    K_e = 0.1033 - 0.02389 * t;
-elseif t <= 5.0
-    K_e = 0.1709 - 0.1170*t + 0.03260*t^2 + 0.001078*t^3 ...
-          - 0.0009076*t^4 - 0.00001331*t^5 + 0.00001345*t^6;
+% --- Genisleme kaybi: temel bagintilar (Eckert vd. B4-B13) ---
+K_e_daire  = Ke_daire(phi_deg);         % konik / dairesel kesit (B4-B6)
+K_e_kare   = Ke_kare(phi_deg);          % kare kesit, DUZELTILMIS (B7-B9)
+K_e_2Ddik  = Ke_2D_dikdortgen(phi_deg); % 2D dikdortgen (B10-B13)
+K_e_2Ddai  = K_e_2Ddik * (K_e_daire / K_e_kare);   % 2D dairesel yanli
+K_e_3Dort  = (K_e_kare  + K_e_daire) / 2;          % 3D ortalama
+K_e_2Dort  = (K_e_2Ddik + K_e_2Ddai) / 2;          % 2D ortalama
+
+% --- Duzlemsellik orani delta_s (Eckert vd.) ---
+% Uc boyutlar: giris kare (w1 x h1), cikis daire (w2 = h2 = D).
+w1 = test_w;          h1 = test_h;
+w2 = diffuser_out_D;  h2 = diffuser_out_D;
+dw = w2 - w1;  dh = h2 - h1;
+if dw == 0 || dh == 0
+    delta_s = 0;                         % bir boyut sabit -> tamamen duzlemsel
 else
-    K_e = -0.09661 + 0.04672 * t;
+    delta_s = min(dh/dw, dw/dh);
+    if delta_s < 0, delta_s = 0; end
 end
 
-K_ex = K_e * ((AR_diffuser - 1) / AR_diffuser)^2;
+% --- Gecis difuzoru: giris kare, cikis dairesel -> ortalama bagintilar ---
+K_e_temel = K_e_3Dort;
+K_e_ek    = K_e_2Dort;
+K_e       = K_e_temel + (1 - delta_s) * (K_e_ek - K_e_temel);   % (B14)
+
+K_ex       = K_e * ((AR_diffuser - 1) / AR_diffuser)^2;
 K_diff_ref = K_f + K_ex;
 dp_diff    = K_diff_ref * q_test;
 
-fprintf('\n--- DIFUZOR KAYBI (Barlow Eq. 3.24-3.29) ---\n');
+% --- Hangi aralik kullanildi? ---
+if phi_deg < 3
+    aralik_txt = '2*theta < 3 der.  -> dogrusal (B5/B8)';
+elseif phi_deg <= 10
+    aralik_txt = '3 <= 2*theta <= 10 der. -> polinom (B4/B7)';
+else
+    aralik_txt = '2*theta > 10 der. -> dogrusal (B6/B9)';
+end
+
+fprintf('\n--- DIFUZOR KAYBI (Barlow Eq. 3.24-3.27 + Eckert vd. K_e) ---\n');
 fprintf('  Giris (Kare)           : %.1f x %.1f cm\n', test_w_cm, test_h_cm);
 fprintf('  Cikis (Dairesel)       : Cap D = %.1f cm\n', diffuser_out_D_cm);
 fprintf('  L_diffuser             : %8.2f  cm  (%.3f m)\n', L_diffuser_cm, L_diffuser);
 fprintf('  AR (A2/A1)             : %8.4f  [-]\n', AR_diffuser);
-fprintf('  theta_e (esit koni)    : %8.3f  derece\n', theta_e_deg);
-fprintf('  f_diff (Haaland)       : %8.5f  [-]\n', f_diff);
+fprintf('  theta_e (yarim aci)    : %8.3f  derece\n', theta_e_deg);
+fprintf('  2*theta_e (toplam aci) : %8.3f  derece\n', phi_deg);
+fprintf('  K_e araligi            : %s\n', aralik_txt);
+fprintf('  Re_diff (giris)        : %8.0f  [-]\n', Re_diff);
+fprintf('  f_diff (Prandtl, giris Re): %6.5f  [-]\n', f_diff);
 fprintf('  K_f (cidar surt.)      : %8.5f  [-]\n', K_f);
-fprintf('  K_e ampirik            : %8.5f  [-]\n', K_e);
+fprintf('  K_e daire  (B4-B6)     : %8.5f  [-]\n', K_e_daire);
+fprintf('  K_e kare   (B7-B9, duz.): %7.5f  [-]\n', K_e_kare);
+fprintf('  K_e 3D ortalama        : %8.5f  [-]\n', K_e_3Dort);
+fprintf('  delta_s (duzlemsellik) : %8.3f  [-]  (1: tam 3D, 0: duzlemsel)\n', delta_s);
+fprintf('  K_e (B14, kullanilan)  : %8.5f  [-]\n', K_e);
 fprintf('  K_ex (genisleme)       : %8.5f  [-]\n', K_ex);
 fprintf('  K_diffuser_ref         : %8.5f  [-]\n', K_diff_ref);
 fprintf('  dP_diffuser            : %8.3f  Pa\n', dp_diff);
+if theta_e_deg > 3.0
+    fprintf('  [UYARI] theta_e = %.2f der. > 3 der. (Barlow s.81 onerisi).\n', theta_e_deg);
+    fprintf('          Ayrilma riski var; K_e ayrilmasiz akisi temsil eder.\n');
+end
+if AR_diffuser > 6.0
+    fprintf('  [UYARI] AR = %.2f > 6 (Barlow s.81: toplam difuzor AR genelde 5-6).\n', AR_diffuser);
+end
 
 %% -------------------------------------------------------------------------
 %% 8. CIKIS ATIM KAYBI  (Barlow Section 3.3)
@@ -1051,7 +1113,7 @@ HP_gercek    = P_fan_gercek / 745.7;
 fprintf('\n--- BASINC KAYBI OZET (V_test = %.1f m/s) ---\n', V_test);
 fprintf('  %-30s : K = %8.5f  -> dP = %8.3f Pa\n', 'Nozzle (Wattendorf)',   K_nozzle,       dp_nozzle);
 fprintf('  %-30s : K = %8.5f  -> dP = %8.3f Pa\n', 'Test kesiti (Prandtl Eq. 3.14)', K_test, dp_test);
-fprintf('  %-30s : K = %8.5f  -> dP = %8.3f Pa\n', 'Difuzor (Barlow)',      K_diff_ref,     dp_diff);
+fprintf('  %-30s : K = %8.5f  -> dP = %8.3f Pa\n', 'Difuzor (Barlow + Eckert)', K_diff_ref, dp_diff);
 fprintf('  %-30s : K = %8.5f  -> dP = %8.3f Pa\n', 'Cikis atim kaybi',      K_exit_ref,     dp_exit);
 fprintf('  %-30s : K = %8.5f  -> dP = %8.3f Pa\n', 'Dinlenme odasi',        K_settling_ref, dp_settling);
 fprintf('  %-30s : K = %8.5f  -> dP = %8.3f Pa\n', 'Model suruklenme',      K_model_ref,    dp_model);
@@ -1089,7 +1151,8 @@ f_avg_arr     = (f_in_arr + f_out_arr) / 2;
 K_nozzle_arr = f_avg_arr .* (L_nozzle_horiz / Dh_out) .* 0.32;
 dp_nozzle_arr = K_nozzle_arr .* q_arr;
 
-f_diff_arr    = f_out_arr;
+% Difuzor: f giris Re ile Prandtl (Bolum 7 ile tutarli); K_ex geometriye bagli
+f_diff_arr    = f_test_arr;
 K_f_arr       = (1 - 1/AR_diffuser^2) .* f_diff_arr ./ (8 * sin(theta_e_rad));
 K_diff_arr    = K_f_arr + K_ex;
 dp_diff_arr   = K_diff_arr .* q_arr;
@@ -1121,7 +1184,7 @@ disp(Ttbl);
 %% 14. GRAFIKLER
 %% -------------------------------------------------------------------------
 
-figure('Name','Ruzgar Tuneli v5.0 (Gercek Geometri)','NumberTitle','off', ...
+figure('Name','Ruzgar Tuneli v5.1 (Gercek Geometri)','NumberTitle','off', ...
        'Units','normalized','Position',[0.04 0.04 0.92 0.88]);
 
 % --- 1: Hacimsel Debi ---
@@ -1174,12 +1237,80 @@ xlabel('V [m/s]'); ylabel('P_{fan} [kW]');
 title(sprintf('Fan Guc (eta=%.0f%%)',fan_verimi*100)); grid on;
 xline(V_test,'r--','LineWidth',1.2,'Label',sprintf('V=%.1f',V_test));
 
-sgtitle(sprintf('Ruzgar Tuneli 1D On Hesap v5.0 | V_{test}=%.1f m/s',V_test), ...
+sgtitle(sprintf('Ruzgar Tuneli 1D On Hesap v5.1 | V_{test}=%.1f m/s',V_test), ...
         'FontSize',12,'FontWeight','bold');
 
 fprintf('\n%s\n', repmat('=',1,60));
-fprintf('  Tum hesaplamalar basariyla tamamlandi (v5.0).\n');
+fprintf('  Tum hesaplamalar basariyla tamamlandi (v5.1).\n');
 fprintf('%s\n', repmat('=',1,60));
+
+
+%% -------------------------------------------------------------------------
+%% 15. CFD ON HAZIRLIK (mesh icin ilk hucre ve inflation)
+%% -------------------------------------------------------------------------
+yplus_hedef = 1;      % k-omega SST icin duvar cozumlu
+r_buyume    = 1.2;    % inflation buyume orani
+
+u_tau = sqrt(tau_w/rho);                              % surtunme hizi
+y1    = yplus_hedef*mu/(rho*u_tau);                   % ilk hucre yuksekligi [m]
+x_bl  = L_nozzle_horiz + test_L;                      % SL gelisme mesafesi
+delta = 0.37*x_bl/(rho*V_test*x_bl/mu)^0.2;           % turbulansli SL kalinligi
+N_inf = ceil(log(1 + delta*(r_buyume-1)/y1)/log(r_buyume));
+t_son = y1*r_buyume^(N_inf-1);                        % son katman kalinligi
+
+fprintf('\n--- CFD ON HAZIRLIK ---\n');
+fprintf('  Velocity-inlet hizi    : %8.3f m/s\n', V_in);
+fprintf('  Surtunme hizi u_tau    : %8.4f m/s\n', u_tau);
+fprintf('  Ilk hucre (y+=%g)      : %8.4f mm\n', yplus_hedef, y1*1e3);
+fprintf('  SL kalinligi ~         : %8.2f mm\n', delta*1e3);
+fprintf('  Inflation katmani      : %d (buyume %.1f)\n', N_inf, r_buyume);
+fprintf('  Son katman kalinligi   : %8.2f mm\n', t_son*1e3);
+
+
+%% =========================================================================
+%% YEREL FONKSIYONLAR: Difuzor genisleme kaybi K_e (Eckert vd., Ek B)
+%%   Girdi p = 2*theta [derece] (toplam esdeger koni acisi)
+%%   Not: Barlow Eq. 3.28-3.29 ayni bagintilarin theta (yarim aci)
+%%   cinsinden yazilmis halidir; kare bagintisinda yazim hatalari vardir.
+%% =========================================================================
+
+function K = Ke_daire(p)
+    % Konik / dairesel kesit (B4-B6). Barlow Eq. 3.28 ile ayni (dogru).
+    if p < 3
+        K = 1.033395e-1 - 1.19465e-2*p;
+    elseif p <= 10
+        K = 1.70925e-1 - 5.84932e-2*p + 8.14936e-3*p^2 + 1.34777e-4*p^3 ...
+            - 5.67258e-5*p^4 - 4.15879e-7*p^5 + 2.10219e-7*p^6;
+    else
+        K = -9.66135e-2 + 2.336135e-2*p;
+    end
+end
+
+function K = Ke_kare(p)
+    % Kare kesit (B7-B9). Orijinal katsayilar (Barlow Eq. 3.29 hatalidir).
+    if p < 3
+        K = 9.62274e-2 - 2.07582e-3*p;
+    elseif p <= 10
+        K = 1.22156e-1 - 2.29480e-2*p + 5.50704e-3*p^2 - 4.08644e-4*p^3 ...
+            - 3.84056e-5*p^4 + 8.74969e-6*p^5 - 3.65217e-7*p^6;
+    else
+        K = -1.321685e-1 + 2.93315e-2*p;
+    end
+end
+
+function K = Ke_2D_dikdortgen(p)
+    % Kare giris kesitli 2D (duzlemsel) dikdortgen difuzor (B10-B13).
+    if p < 3
+        K = 1.0e-1 - 5.333333e-3*p;
+    elseif p <= 9
+        K = 3.23334e-1 - 5.82939e-2*p - 4.97151e-2*p^2 + 1.99093e-2*p^3 ...
+            - 1.98630e-3*p^4 + 2.06857e-5*p^5 + 3.81387e-6*p^6;
+    elseif p <= 10
+        K = 5.72853 - 1.21832*p + 7.08483e-2*p^2;
+    else
+        K = -1.36146 + 1.986460e-1*p;
+    end
+end
 </script>
 
 <script>
@@ -1247,10 +1378,29 @@ function defaults(){ const p={mode:'auto'}; FIELDS.forEach(f=>p[f.k]=f.def); ret
 
 function haaland(Re){ return Math.pow(1/(-1.8*Math.log10(6.9/Math.max(Re,4001))),2); }
 function prandtl(Re){ let f=0.02; for(let i=0;i<10;i++) f=Math.pow(2*Math.log10(Re*Math.sqrt(f))-0.8,-2); return f; }
-function KeOf(t){
-  if(t<=1.5) return {v:0.1033-0.02389*t, br:'θ ≤ 1.5°'};
-  if(t<=5.0) return {v:0.1709-0.1170*t+0.03260*t*t+0.001078*t**3-0.0009076*t**4-0.00001331*t**5+0.00001345*t**6, br:'1.5° < θ ≤ 5°, 6th-order polynomial'};
-  return {v:-0.09661+0.04672*t, br:'θ > 5°, linear branch'};
+/* Diffuser expansion loss K_e, Eckert, Mort & Jope (1976) App. B; p = 2θ [deg] */
+function KeCirc(p){
+  if(p<3) return 1.033395e-1-1.19465e-2*p;
+  if(p<=10) return 1.70925e-1-5.84932e-2*p+8.14936e-3*p*p+1.34777e-4*p**3-5.67258e-5*p**4-4.15879e-7*p**5+2.10219e-7*p**6;
+  return -9.66135e-2+2.336135e-2*p;
+}
+function KeSq(p){
+  if(p<3) return 9.62274e-2-2.07582e-3*p;
+  if(p<=10) return 1.22156e-1-2.29480e-2*p+5.50704e-3*p*p-4.08644e-4*p**3-3.84056e-5*p**4+8.74969e-6*p**5-3.65217e-7*p**6;
+  return -1.321685e-1+2.93315e-2*p;
+}
+function Ke2DRect(p){
+  if(p<3) return 1.0e-1-5.333333e-3*p;
+  if(p<=9) return 3.23334e-1-5.82939e-2*p-4.97151e-2*p*p+1.99093e-2*p**3-1.98630e-3*p**4+2.06857e-5*p**5+3.81387e-6*p**6;
+  if(p<=10) return 5.72853-1.21832*p+7.08483e-2*p*p;
+  return -1.36146+1.986460e-1*p;
+}
+function KeOf(p,w1,h1,D){
+  const c=KeCirc(p), sq=KeSq(p), r2=Ke2DRect(p), c2=r2*(c/sq);
+  const k3=(sq+c)/2, k2=(r2+c2)/2;
+  const dw=D-w1, dh=D-h1; let ds=(dw===0||dh===0)?0:Math.min(dh/dw,dw/dh); if(ds<0) ds=0;
+  const br=p<3?'2θ < 3°, linear branch':p<=10?'3° ≤ 2θ ≤ 10°, 6th-order polynomial':'2θ > 10°, linear branch';
+  return {v:k3+(1-ds)*(k2-k3), circ:c, sq, k3, ds, br};
 }
 function compute(p,Vo){
   const V=Vo==null?p.V:Vo, cm=0.01, r={V};
@@ -1271,9 +1421,9 @@ function compute(p,Vo){
   r.Ain=nw*nh; r.Pin=2*(nw+nh); r.Dhin=4*r.Ain/r.Pin; r.CR=r.Ain/A; r.Vin=r.Q/r.Ain; r.qin=0.5*r.rho*r.Vin*r.Vin; r.dpB=r.qin-r.q;
   r.Rein=r.rho*r.Vin*r.Dhin/r.mu; r.fin=haaland(r.Rein); r.fout=haaland(r.Re); r.favg=(r.fin+r.fout)/2;
   r.Kn=r.favg*(Ln/r.Dh)*0.32;
-  r.the=Math.atan(0.5*(Math.sqrt(AR)-1)/(Ld/r.Dh)); r.thd=r.the*180/Math.PI;
-  r.fdiff=haaland(r.Re); r.Kf=(1-1/AR**2)*r.fdiff/(8*Math.sin(r.the));
-  const ke=KeOf(r.thd); r.Ke=ke.v; r.KeBr=ke.br; r.Kex=r.Ke*((AR-1)/AR)**2; r.Kd=r.Kf+r.Kex;
+  r.the=Math.atan(0.5*(Math.sqrt(AR)-1)/(Ld/r.Dh)); r.thd=r.the*180/Math.PI; r.phi=2*r.thd;
+  r.fdiff=r.f; r.Kf=(1-1/AR**2)*r.fdiff/(8*Math.sin(r.the));
+  const ke=KeOf(r.phi,tw,th,Dd); r.Ke=ke.v; r.KeBr=ke.br; r.KeC=ke.circ; r.KeS=ke.sq; r.Ke3=ke.k3; r.ds=ke.ds; r.Kex=r.Ke*((AR-1)/AR)**2; r.Kd=r.Kf+r.Kex;
   r.Kexit=1/AR**2; r.Vexit=r.Q/Ado;
   r.Kh=p.lamh*(p.LhDh+3)*(1/p.betah)**2+(1/p.betah-1)**2;
   r.betas=(1-dw/wm)**2; r.sigmas=1-r.betas; r.Rew=r.rho*r.Vin*dw/r.mu;
@@ -1490,16 +1640,19 @@ function nbData(r,p){
     ['Loss coefficient',I('K')+'<sub>nozzle</sub> = '+I('f')+'<sub>avg</sub> · ('+I('L')+' / '+I('D')+'<sub>h</sub>) · 0.32',nf(r.Kn,5),'–'],
     ['Pressure loss',I('Δp')+' = '+I('K')+' · '+I('q'),nf(r.dp.noz,3),'Pa'],
   ],note:'As in the MATLAB script, the contraction length is divided by the test section hydraulic diameter (D_h).'});
-  S.push({sec:7,t:'Diffuser',ref:'B-R-P Eq. 3.24–3.29',k:'diff',res:'K = '+nf(r.Kd,5),rows:[
+  S.push({sec:7,t:'Diffuser',ref:'B-R-P Eq. 3.24–3.27 · Eckert et al. (1976) App. B',k:'diff',res:'K = '+nf(r.Kd,5),rows:[
     ['Area ratio',I('AR')+' = '+I('A')+'<sub>2</sub> / '+I('A')+'<sub>1</sub> = (π'+I('D')+'²/4) / '+I('A')+'<sub>test</sub>',nf(r.AR,4),'–'],
     ['Equivalent cone angle',I('θ')+'<sub>e</sub> = atan( ½(√'+I('AR')+' − 1) / ('+I('L')+'/'+I('D')+'<sub>h</sub>) )',nf(r.thd,3),'°'],
-    ['Friction (Haaland)',I('f')+'('+I('Re')+'<sub>test</sub>)',nf(r.fdiff,5),'–'],
+    ['Total cone angle','2'+I('θ')+'<sub>e</sub>',nf(r.phi,3),'°'],
+    ['Friction (Prandtl)',I('f')+' = '+I('f')+'<sub>test</sub> (Eq. 3.14, inlet '+I('Re')+')',nf(r.fdiff,5),'–'],
     ['Wall friction loss',I('K')+'<sub>f</sub> = (1 − 1/'+I('AR')+'²) '+I('f')+' / (8 sin '+I('θ')+'<sub>e</sub>)',nf(r.Kf,5),'–'],
-    ['Expansion coefficient',I('K')+'<sub>e</sub>, Eq. 3.28 circular section · '+r.KeBr,nf(r.Ke,5),'–'],
+    ['Circular / square K<sub>e</sub>','Eckert B4–B6 / B7–B9 · '+r.KeBr,nf(r.KeC,5)+' / '+nf(r.KeS,5),'–'],
+    ['Flatness ratio',I('δ')+'<sub>s</sub> = min(Δ'+I('h')+'/Δ'+I('w')+', Δ'+I('w')+'/Δ'+I('h')+')',nf(r.ds,3),'–'],
+    ['Expansion coefficient',I('K')+'<sub>e</sub> = '+I('K')+'<sub>3D</sub> + (1 − '+I('δ')+'<sub>s</sub>)('+I('K')+'<sub>2D</sub> − '+I('K')+'<sub>3D</sub>), Eckert B14',nf(r.Ke,5),'–'],
     ['Expansion loss',I('K')+'<sub>ex</sub> = '+I('K')+'<sub>e</sub> (('+I('AR')+' − 1)/'+I('AR')+')²',nf(r.Kex,5),'–'],
     ['Total coefficient',I('K')+'<sub>d</sub> = '+I('K')+'<sub>f</sub> + '+I('K')+'<sub>ex</sub>',nf(r.Kd,5),'–'],
     ['Pressure loss',I('Δp')+' = '+I('K')+'<sub>d</sub> · '+I('q'),nf(r.dp.diff,3),'Pa'],
-  ],note:'The square-section polynomial (Eq. 3.29) is not used because it jumps at 5°; the diffuser transitions from square to circular anyway.'});
+  ],note:'K_e is taken from the original Eckert, Mort & Jope relations (in 2θ). The square-section form printed as Barlow Eq. 3.29 contains typos; the corrected relations are continuous at 3° and 10°. For the square-to-circular transition the 3D (square + circular) and 2D averages are blended by the flatness ratio.'+(r.thd>3?' Warning: θ_e > 3° (Barlow p. 81), separation risk; K_e assumes attached flow.':'')+(r.AR>6?' Warning: AR > 6 (Barlow p. 81 suggests 5–6).':'')});
   S.push({sec:8,t:'Exit (dump) loss',ref:'B-R-P §3.3',k:'exit',res:'K = '+nf(r.Kexit,5),rows:[
     ['Exit velocity',I('V')+'<sub>exit</sub> = '+I('Q')+' / '+I('A')+'<sub>2</sub>',nf(r.Vexit,3),'m/s'],
     ['Loss coefficient',I('K')+'<sub>exit</sub> = 1 / '+I('AR')+'²',nf(r.Kexit,5),'–'],
