@@ -739,6 +739,95 @@ function auditWhere(id){
   if(id==='borda') return pathAt(PT,B.fan?B.fan.s1:0);
   return pathAt(PT,0);
 }
+/* ---- one-click fixes ----
+   For each check: which input to move and how far it may go. The smallest change that clears the check is found
+   by recomputing the circuit (scan toward the bound, then bisect), rounded to a sensible step on the safe side.
+   A fix is only offered if it does not push any other check to a warning or worse. */
+const SOLVE={
+ d1:[{k:'th1',to:0.5,step:0.1},{k:'s12',to:p=>p.a+1,step:1}],
+ gec:[{k:'Lgec',to:p=>p.Lgec*4,step:5},{k:'fsplit',to:6,step:1}],
+ gecw:[{k:'fsplit',to:6,step:1},{k:'Lgec',to:p=>p.Lgec*4,step:5}],
+ d3:[{k:'th3',to:0.5,step:0.1}],
+ d3c:[{k:'Lfd',to:p=>Math.max(300,p.Lfd*4),step:5}],
+ arc:[{k:'s34',to:p=>p.a+1,step:1},{k:'s12',to:p=>p.a+1,step:1}],
+ gad:[{k:'gN',to:8,step:1},{k:'s34',to:p=>p.a*Math.sqrt(p.CR)-1,step:1}],
+ gadg:[{k:'gad2th',to:20,step:1}],
+ cr:[{k:'CR',to:6,step:0.1}],
+ cl:[{k:'Lc',to:p=>p.Lc*3,step:5}],
+ hc:[{set:p=>({hcL:Math.round(7*p.hcD),hcB:Math.max(p.hcB,0.8)})}],
+ beta:[{k:'elwm',to:p=>p.elwm*4,step:0.05},{k:'eldw',to:p=>p.eldw/4,step:0.01},{k:'gwm',to:p=>p.gwm*4,step:0.1}],
+ scsp:[{k:'del',to:p=>p.del*5,step:1}],
+ sctc:[{k:'xel',to:0,step:1},{k:'Ldn',to:p=>p.Ldn*3,step:5}],
+ lay:[{k:'Ldn',to:p=>p.Ldn*3,step:5}],
+ hxv:[{set:p=>p.yer==='ayri'?{yer:'birlikte'}:null},{k:'CR',to:16,step:0.1}],
+ vane:[{set:()=>({vhc:0.25})}],
+ ffit:[{k:'fD',to:5,step:1},{k:'fw',to:p=>p.fw*3,step:5}],
+ fcov:[{k:'fD',to:p=>p.fD*3,step:1}],
+ ftip:[{k:'fN',to:p=>p.fN*4,step:1},{k:'fD',to:p=>p.fD*3,step:1}],
+ fmarg:[{set:()=>({marg:1.3})}],
+ close:[{k:'Ldn',to:p=>p.Ldn*4,step:5},{k:'Lgec',to:p=>p.Lgec/4,step:5}],
+ gap:[{k:'H',to:p=>p.H*3,step:5}],
+ mch:[{k:'mc',to:1,step:0.5}],
+ mfit:[{k:'mx',to:0,step:1},{k:'LTS',to:p=>p.LTS*3,step:5}],
+ mach:[{k:'V',to:1,step:0.5}],
+ tst:[{k:'T',to:-40,step:0.5}],
+ lwc:[{k:'LWC',to:0.1,step:0.05}],
+ mvd:[{k:'MVD',to:15,step:1}],
+ drop:[{k:'xsp',to:0,step:1},{k:'spT',to:0,step:1}],
+ spb:[{k:'spd',to:5,step:1},{k:'spN',to:1,step:1}],
+ cond:[{k:'it',to:p=>p.it*6,step:5}]
+};
+const RANK={ok:0,info:1,warn:2,bad:3};
+function auditOf(q){
+  if(validate(q).length) return null;
+  const h=E.air(q.T,q.p), G=buildG(q), R=E.circuit(G,q.V,q.yer,h);
+  return E.audit(R,G,h,E.icing(R,G,h));
+}
+let BLOCK=null;
+function fixPasses(id,patch,base){
+  const AU=auditOf(Object.assign({},P,patch)); if(!AU) return false;
+  const me=AU.find(c=>c.id===id); if(me&&RANK[me.sev]>1) return false;
+  const worse=AU.find(c=>c.id!==id&&RANK[c.sev]>Math.max(1,base[c.id]==null?1:base[c.id]));
+  if(worse){ BLOCK=BLOCK||worse.title; return false; }
+  return true;
+}
+function solveFix(id,sp,base){
+  if(sp.set){ const all=sp.set(P)||{}, patch={}; for(const k in all) if(all[k]!==P[k]) patch[k]=all[k];
+    return Object.keys(patch).length&&fixPasses(id,patch,base)?patch:null; }
+  const f=FK[sp.k], cur=P[sp.k], to=typeof sp.to==='function'?sp.to(P):sp.to, dir=Math.sign(to-cur);
+  if(!dir||!isFinite(to)) return null;
+  const q=x=>f.int?Math.round(x):x, ok=x=>fixPasses(id,{[sp.k]:q(x)},base);
+  const N=20; let lo=cur, hi=null;
+  for(let i=1;i<=N;i++){ const x=cur+(to-cur)*i/N; if(ok(x)){ hi=x; break; } lo=x; }
+  if(hi==null) return null;
+  for(let i=0;i<14;i++){ const m=(lo+hi)/2; if(ok(m)) hi=m; else lo=m; }
+  const dec=Math.max(0,-Math.floor(Math.log10(sp.step)+1e-9)), rnd=x=>+(Math.round(x/sp.step)*sp.step).toFixed(dec);
+  let v=rnd(hi);
+  for(let t=0;t<4;t++){ if((v-to)*dir>1e-9) v=to; if(ok(v)) return {[sp.k]:q(v)}; v=+(v+dir*sp.step).toFixed(dec); }
+  return null;
+}
+let FXC={key:'',m:{}}, UNDO=null;
+function fixesFor(id){
+  const key=JSON.stringify(P); if(FXC.key!==key) FXC={key,m:{}};
+  if(!FXC.m[id]){ const base={}; S.AU.forEach(c=>base[c.id]=RANK[c.sev]);
+    BLOCK=null; const seen=new Set(); FXC.m[id]=(SOLVE[id]||[]).map(sp=>solveFix(id,sp,base)).filter(p=>{ if(!p) return false; const s=JSON.stringify(p); if(seen.has(s)) return false; seen.add(s); return true; }).slice(0,2);
+    FXC.m[id].block=BLOCK; }
+  return FXC.m[id];
+}
+const fv=(k,v)=>{ const f=FK[k]; if(f.kind==='seg') return (f.opts.find(o=>o[0]===v)||[,v])[1]; if(f.kind==='bool') return v?'on':'off'; const n=String(+(+v).toFixed(3)), u=f.unit; return !u||u==='–'?n:u==='×'?'×'+n:u==='°'||u==='%'?n+u:n+' '+u; };
+function fixLabel(patch){ return Object.keys(patch).map(k=>FK[k].label+' '+fv(k,P[k])+' → '+fv(k,patch[k])).join(', '); }
+function fixHTML(id){
+  const fx=fixesFor(id);
+  return fx.length?'<span class="lb">One-click fix</span>'+fx.map((p,i)=>'<button type="button" class="au-apply" data-apply="'+id+'" data-i="'+i+'">'+esc(fixLabel(p))+'</button>').join('')
+    :'<span class="lb">No single-input fix'+(fx.block?': clearing it raises “'+esc(fx.block)+'”':'')+'</span>';
+}
+function applyFix(id,i){
+  const patch=(FXC.m[id]||[])[i]; if(!patch) return;
+  const prev={}; for(const k in patch) prev[k]=P[k];
+  const label=fixLabel(patch); Object.assign(P,patch); UNDO={prev};
+  syncInputs(); schedule(true);
+  toast('ok','Applied',label,null,{t:'Undo',fn:()=>{ if(!UNDO) return; Object.assign(P,UNDO.prev); UNDO=null; syncInputs(); schedule(true); }});
+}
 function renderAudit(){
   const AU=S.AU, cnt=sevCount(AU);
   const tops=[['bad','Critical',cnt.bad],['warn','Warnings',cnt.warn],['info','Notes',cnt.info],['ok','Passed',cnt.ok]];
@@ -754,6 +843,7 @@ function renderAudit(){
     const refs=c.refs.map(r=>'<span class="au-ref" title="'+esc(E.REFS[r]?E.REFS[r].t:r)+'">['+r+']</span>').join('');
     return '<details class="au-c sev-'+c.sev+'" data-id="'+c.id+'"'+(open.has(c.id)?' open':'')+'><summary><span class="no">'+pad2(AU.indexOf(c)+1)+'</span><span class="tt">'+esc(c.title)+'<small>'+SEVN[c.sev]+' · '+c.cat+' · limit '+esc(c.lim)+'</small></span><span class="vv">'+esc(c.val)+'</span><span class="chev" aria-hidden="true"></span></summary>'+
       '<div class="au-b">'+gh+'<p>'+esc(c.msg)+'</p>'+(c.fix&&c.fix!=='—'?'<p class="fix"><b>What to change:</b> '+esc(c.fix)+'</p>':'')+
+      (c.sev!=='ok'&&c.sev!=='info'&&SOLVE[c.id]?'<div class="au-fix" data-fixfor="'+c.id+'">'+(open.has(c.id)?fixHTML(c.id):'')+'</div>':'')+
       '<div class="au-meta">'+refs+(c.fields.length?'<button class="au-go" type="button" data-field="'+c.fields[0]+'">Edit '+esc(FK[c.fields[0]]?FK[c.fields[0]].label.toLowerCase():c.fields[0])+' →</button>':'')+'</div></div></details>';
   }).join(''):'<div class="au-empty">Nothing in this category.</div>';
   renderAuditMap(list);
@@ -1099,11 +1189,11 @@ function diffAudit(fromEdit){
   }
   prevSev=now;
 }
-function toast(sev,title,sub,id){
+function toast(sev,title,sub,id,act){
   const host=$('#itoasts'); while(host.children.length>=3) host.firstElementChild.remove();
   const el=document.createElement('div'); el.className='itoast sev-'+sev; el.setAttribute('role','status');
-  el.innerHTML='<span class="d"></span><div><b>'+esc(title)+'</b><small>'+esc(sub)+'</small></div><button type="button">View</button>';
-  el.querySelector('button').addEventListener('click',()=>{ el.remove(); openAudit(id); });
+  el.innerHTML='<span class="d"></span><div><b>'+esc(title)+'</b><small>'+esc(sub)+'</small></div><button type="button">'+(act?act.t:'View')+'</button>';
+  el.querySelector('button').addEventListener('click',()=>{ el.remove(); if(act) act.fn(); else openAudit(id); });
   host.appendChild(el);
   let t=0; const arm=()=>{ t=setTimeout(()=>{ el.classList.add('out'); setTimeout(()=>el.remove(),420); },8000); };
   el.addEventListener('pointerenter',()=>clearTimeout(t)); el.addEventListener('pointerleave',arm); arm();
@@ -1196,6 +1286,8 @@ APP.addEventListener('click',e=>{
   const fl=e.target.closest('#iauTop [data-f]'); if(fl){ auFilter=fl.dataset.f===auFilter&&['bad','warn','info','ok'].includes(fl.dataset.f)?'issues':fl.dataset.f; renderAudit(); return; }
   const pin=e.target.closest('#iauMap .pin'); if(pin){ const d=$('#iauList details[data-id="'+pin.dataset.id+'"]'); if(d){ d.open=true; d.scrollIntoView({block:'center',behavior:RM.matches?'auto':'smooth'}); setAuHot(pin.dataset.id); } return; }
 });
+$('#iauList').addEventListener('click',e=>{ const b=e.target.closest('.au-apply'); if(b) applyFix(b.dataset.apply,+b.dataset.i); });
+$('#iauList').addEventListener('toggle',e=>{ const d=e.target; if(!d.open) return; const h=d.querySelector('.au-fix'); if(h&&!h.innerHTML) h.innerHTML=fixHTML(d.dataset.id); },true);
 $('#iauList').addEventListener('pointerover',e=>{ const d=e.target.closest('.au-c'); if(d&&d.dataset.id!==auHot) setAuHot(d.dataset.id); });
 $('#iauMap').addEventListener('pointerover',e=>{ const p=e.target.closest('.pin'); if(p) setAuHot(p.dataset.id); });
 $('#ibtnReset').addEventListener('click',()=>{ const keep={fcQ:P.fcQ,fcdp:P.fcdp,fcrho:P.fcrho,fcname:P.fcname}; P=Object.assign(defaults(),keep); syncInputs(); $$('#igeoGroups .inp').forEach(x=>x.classList.remove('bad')); schedule(true); });

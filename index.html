@@ -190,6 +190,13 @@ html.has-cur .tip{display:none}
 .chip::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--h-muted);flex:none}
 .chip.ok::before{background:var(--ok)} .chip.warn::before{background:var(--warn)} .chip.bad::before{background:var(--bad)}
 .chip.warn{border-color:rgba(242,176,76,.45)} .chip.bad{border-color:rgba(255,122,107,.55)}
+.chip{flex-wrap:wrap}
+.chip .fixb{font:600 11.5px var(--f-body);color:var(--h-ink);background:transparent;border:1px solid color-mix(in srgb,var(--h-ink) 28%,transparent);border-radius:999px;padding:2px 9px;cursor:pointer;transition:border-color .2s,background .2s}
+.chip .fixb::before{content:"↳ ";color:var(--h-muted)}
+.chip .fixb:hover,.chip .fixb:focus-visible{border-color:var(--h-ink);background:var(--h-line)}
+.chip.undo{border-style:dashed}
+.chip.undo::before{background:var(--h-muted)}
+.chip.undo .fixb::before{content:"↶ "}
 .errbox{margin-top:14px;border:1px solid var(--bad);border-radius:8px;padding:10px 14px;color:var(--bad);background:rgba(255,122,107,.08);font-size:14px}
 .errbox ul{margin:4px 0 0;padding-left:18px}
 .ticker{margin-top:26px;border-top:1px solid var(--h-line);overflow:hidden;white-space:nowrap;font-family:var(--f-mono);font-size:12.5px;color:var(--h-muted);padding:13px 0}
@@ -1714,7 +1721,7 @@ function buildGeo(){
     inp.addEventListener('input',()=>{
       let v=parseNum(inp.value); if(f.k==='N'&&isFinite(v)&&v!=='') v=Math.round(v);
       if(v===''&&!f.opt) v=NaN;
-      P[f.k]=v; inp.parentNode.classList.toggle('bad',!(f.opt&&v==='')&&!isFinite(v));
+      P[f.k]=v; UNDO=null; inp.parentNode.classList.toggle('bad',!(f.opt&&v==='')&&!isFinite(v));
       if(f.k==='V') syncDock();
       schedule();
     });
@@ -1744,8 +1751,8 @@ function syncDock(){
   if(document.activeElement!==dockV) dockV.value=isFinite(P.V)?showNum(P.V):'';
   if(isFinite(P.V)) dockR.value=Math.min(80,Math.max(1,P.V));
 }
-dockR.addEventListener('input',()=>{ P.V=Number(dockR.value); dockV.value=showNum(P.V); const i=$('#in-V'); if(i) i.value=showNum(P.V); schedule(); });
-dockV.addEventListener('input',()=>{ const v=parseNum(dockV.value); P.V=v===''?NaN:v; if(isFinite(P.V)) dockR.value=Math.min(80,Math.max(1,P.V)); const i=$('#in-V'); if(i) i.value=dockV.value; schedule(); });
+dockR.addEventListener('input',()=>{ UNDO=null; P.V=Number(dockR.value); dockV.value=showNum(P.V); const i=$('#in-V'); if(i) i.value=showNum(P.V); schedule(); });
+dockV.addEventListener('input',()=>{ UNDO=null; const v=parseNum(dockV.value); P.V=v===''?NaN:v; if(isFinite(P.V)) dockR.value=Math.min(80,Math.max(1,P.V)); const i=$('#in-V'); if(i) i.value=dockV.value; schedule(); });
 function measureDock(){ document.body.style.setProperty('--dock-h',$('#dock').offsetHeight+'px'); }
 
 /* ================= hero text ================= */
@@ -1760,13 +1767,19 @@ function renderHero(r){
   else c.push(['bad','Mach '+nf(r.M,3)+' · isentropic relations required']);
   const crOk=r.CR>=6&&r.CR<=10;
   c.push([crOk?'ok':'warn','Contraction ratio CR = '+nf(r.CR,2)+(crOk?' · within the typical 6–10':' · typical range is 6–10')]);
-  c.push([r.thd<=3.5?'ok':'warn','Diffuser equivalent angle θe = '+nf(r.thd,2)+'°'+(r.thd<=3.5?'':' · separation risk, keep below ~3–3.5°')]);
+  const fx=quickFixes(r);
+  if(fx.mach) c[0].push(fx.mach);
+  c[1].push(fx.cr);
+  c.push([r.thd<=3.5?'ok':'warn','Diffuser equivalent angle θe = '+nf(r.thd,2)+'°'+(r.thd<=3.5?'':' · separation risk, keep below ~3–3.5°'),fx.diff]);
   if(P.mode==='auto'){
     const g=r.gap_cm; c.push([g>=2&&g<=3?'ok':(g<2?'bad':'warn'),'Boundary-layer gap '+nf(g,2)+' cm'+(g>=2&&g<=3?' · 2–3 cm satisfied':(g<2?' · below 2 cm':' · above 3 cm, conservative'))]);
     c.push(['ok','Solid blockage 5% · Maskell (1963)']);
   } else c.push(['warn','Chord entered manually · model loss taken as 0']);
   if(r.Rew<400) c.push(['ok','Screen Re_w = '+nf(r.Rew,0)+' · K_Rn correction active']);
-  $('#checks').innerHTML=c.map(x=>'<li class="chip '+x[0]+'">'+x[1]+'</li>').join('');
+  FIXES=[];
+  const fb=list=>(list||[]).map(f=>'<button type="button" class="fixb" data-fx="'+(FIXES.push(f)-1)+'" title="Apply this change">'+f.label+'</button>').join('');
+  $('#checks').innerHTML=(UNDO?'<li class="chip undo">Applied: '+UNDO.label+'<button type="button" class="fixb" data-undo>Undo</button></li>':'')+
+    c.map(x=>'<li class="chip '+x[0]+'">'+x[1]+fb(x[2])+'</li>').join('');
   $('#dDp').textContent=nf(r.dptot,1)+' Pa';
   $('#dP').textContent=pw.v+' '+pw.u;
   const tk=['Re<sub>Dh</sub> <b>'+ni(r.Re)+'</b>','Mach <b>'+nf(r.M,3)+'</b>','q <b>'+nf(r.q,1)+' Pa</b>','Q <b>'+ni(r.Q*3600)+' m³/h</b>','ṁ <b>'+nf(r.mdot,3)+' kg/s</b>',
@@ -1775,6 +1788,36 @@ function renderHero(r){
   const one=tk.map(t=>'<span>'+t+'</span>').join('');
   $('#ticker').innerHTML=one+one;
 }
+
+/* one-click fixes: invert the check for the field(s) involved, round toward the safe side, then verify by recomputing */
+let FIXES=[], UNDO=null;
+function quickFixes(r){
+  const out={}, tq=Math.tan(3.5*Math.PI/180);
+  const tryP=(label,patch,pass)=>{ const q=Object.assign({},P,patch); if(validate(q).length) return null; return pass(compute(q))?{label,patch}:null; };
+  const keep=a=>{ a=a.filter(Boolean); return a.length?a:null; };
+  if(r.M>=0.3){ const V=Math.floor(0.299*r.a*10)/10; out.mach=keep([tryP('Speed → '+V+' m/s',{V},t=>t.M<0.3)]); }
+  if(r.CR<6||r.CR>10){
+    const lo=r.CR<6, k=Math.sqrt((lo?6:10)/r.CR), rd=lo?Math.ceil:Math.floor, nw=rd(P.nw*k), nh=rd(P.nh*k);
+    out.cr=keep([tryP('Inlet → '+nw+'×'+nh+' cm',{nw,nh},t=>t.CR>=6&&t.CR<=10)]);
+  }
+  if(r.thd>3.5){
+    /* tan θe = (√AR − 1)/2 · D_h/L, solved for L (lengthen) or for the outlet diameter at fixed L */
+    const L=Math.ceil(0.5*(Math.sqrt(r.AR)-1)*r.Dh/tq*100);
+    const AR=(1+2*tq*P.Ld*0.01/r.Dh)**2, D=Math.floor(2*Math.sqrt(AR*r.A/Math.PI)*100);
+    out.diff=keep([tryP('Length → '+L+' cm',{Ld:L},t=>t.thd<=3.5),tryP('Keep length, outlet Ø → '+D+' cm',{Dd:D},t=>t.thd<=3.5)]);
+  }
+  return out;
+}
+function applyFix(f){
+  const prev={}; for(const k in f.patch) prev[k]=P[k];
+  Object.assign(P,f.patch); UNDO={label:f.label,prev};
+  syncInputs(); schedule();
+}
+$('#checks').addEventListener('click',e=>{
+  const b=e.target.closest('.fixb'); if(!b) return;
+  if(b.hasAttribute('data-undo')){ if(UNDO){ Object.assign(P,UNDO.prev); UNDO=null; syncInputs(); schedule(); } return; }
+  const f=FIXES[+b.dataset.fx]; if(f) applyFix(f);
+});
 
 /* ================= budget ================= */
 const RHO_W=998, G0=9.80665;
