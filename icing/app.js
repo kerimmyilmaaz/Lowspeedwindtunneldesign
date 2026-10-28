@@ -1255,6 +1255,7 @@ function update(fromEdit){
   if(errs.length){ eh.innerHTML='<div class="errbox" role="alert"><b>Calculation paused. Fix the input:</b><ul>'+errs.map(e=>'<li>'+esc(e)+'</li>').join('')+'</ul></div>'; return; }
   eh.innerHTML=''; save();
   S=compute();
+  if(window.SL_sound) SL_sound.set('closed',{V:S.R.V,shaft:S.R.fan.n_rpm/60,fans:S.G.fan.N,spray:S.G.LWC});
   const gk=JSON.stringify(FIELDS.filter(f=>!['V','T','p','LWC','MVD','Tlab','RH','etaf','etam','marg','tmarg','Vs','LWCs','leak','psi','nu','fK','mCd','hxdp','hxV','hxn','hxf','elK','spCd','spT','ik','ihi','iho','buz1','fveri'].includes(f.k)).map(f=>P[f.k]));
   if(gk!==update.gk){ update.gk=gk; PT=buildPath(S.R,S.G); LANES=buildLanes(PT,24); [HV,ZV].forEach(v=>{ if(v.gl) v.gl.upload(LANES); }); layoutHero(); layoutZoom(); buildRail(); drops=[]; }
   else { drawBase(HV); drawFallback(HV); }

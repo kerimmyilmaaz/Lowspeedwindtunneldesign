@@ -427,6 +427,19 @@ footer p{margin:0 0 8px}
 .dv .inp input{font-size:17px;font-weight:600;padding:6px 6px}
 .ds{grid-area:s;position:relative}
 .dout{grid-area:o;display:flex;gap:18px;font-family:var(--f-mono);font-size:12px;color:var(--muted);white-space:nowrap}
+.snd{flex:none;align-self:center;width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--muted);display:grid;place-items:center;padding:0;cursor:pointer;transition:color .2s,border-color .2s,background .2s}
+.snd svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.snd .spk{fill:currentColor;stroke:none}
+.snd .w1,.snd .w2{display:none}
+.snd:hover,.snd:focus-visible{color:var(--ink);border-color:var(--ink)}
+.snd[aria-pressed="true"]{color:var(--accent);border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
+.snd[aria-pressed="true"] .x{display:none}
+.snd[aria-pressed="true"] .w1,.snd[aria-pressed="true"] .w2{display:block;animation:sndw 1.6s ease-in-out infinite}
+.snd[aria-pressed="true"] .w2{animation-delay:.25s}
+@keyframes sndw{0%,100%{opacity:.35}50%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.snd .w1,.snd .w2{animation:none!important}}
+/* phones: the speed box keeps its unit and aria-label; dropping the caption leaves room for the sound button */
+@media (max-width:480px){#dock .dv label{display:none} #dock .dout{gap:12px}}
 .dout b{display:block;font-family:var(--f-display);font-stretch:110%;font-size:17px;color:var(--ink);font-weight:750;font-variant-numeric:tabular-nums}
 input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:30px;background:transparent;cursor:pointer;margin:0}
 input[type=range]::-webkit-slider-runnable-track{height:8px;border-radius:4px;background:linear-gradient(90deg,var(--smoke-a),var(--accent) 55%,var(--smoke-b))}
@@ -652,7 +665,7 @@ input[type=range]::-moz-range-thumb{width:12px;height:24px;border-radius:4px;bac
   <div class="dock-in">
     <div class="dv"><label for="dockV">Test speed</label><div class="inp"><input id="dockV" inputmode="decimal" autocomplete="off" aria-label="Test speed (m/s)"><span>m/s</span></div></div>
     <div class="ds"><input type="range" id="dockR" min="1" max="80" step="0.5" aria-label="Test speed slider"><div class="ticks"><span>1</span><span>20</span><span>40</span><span>60</span><span>80</span></div></div>
-    <div class="dout"><div>Total Δp<b id="dDp">–</b></div><div>Fan power<b id="dP">–</b></div></div>
+    <div class="dout"><button class="snd" type="button" aria-pressed="false" aria-label="Play tunnel sound" title="Play tunnel sound"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="spk" d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="w1" d="M15.5 9.2a4 4 0 0 1 0 5.6"/><path class="w2" d="M18.2 6.6a7.7 7.7 0 0 1 0 10.8"/><path class="x" d="M16 9.5l5 5M21 9.5l-5 5"/></svg></button><div>Total Δp<b id="dDp">–</b></div><div>Fan power<b id="dP">–</b></div></div>
   </div>
 </div>
 </div><!-- /#appOpen -->
@@ -873,7 +886,7 @@ input[type=range]::-moz-range-thumb{width:12px;height:24px;border-radius:4px;bac
     <div class="dv"><label for="idV">Test speed</label><div class="inp"><input id="idV" inputmode="decimal" autocomplete="off" aria-label="Test speed (m/s)"><span>m/s</span></div></div>
     <div class="ds"><input type="range" id="idR" min="1" max="60" step="0.5" aria-label="Test speed slider"><div class="ticks"><span>1</span><span>15</span><span>30</span><span>45</span><span>60</span></div></div>
     <div class="dv dt"><label for="idT">Static T</label><div class="inp"><input id="idT" inputmode="decimal" autocomplete="off" aria-label="Static temperature (°C)"><span>°C</span></div></div>
-    <div class="dout"><div>Total Δp<b id="idDp">–</b></div><div>Shaft<b id="idP">–</b></div><div>Cooling<b id="idQ">–</b></div><button class="dbadge" id="idAudit" type="button" data-igo="iaudit"></button></div>
+    <div class="dout"><button class="snd" type="button" aria-pressed="false" aria-label="Play tunnel sound" title="Play tunnel sound"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="spk" d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="w1" d="M15.5 9.2a4 4 0 0 1 0 5.6"/><path class="w2" d="M18.2 6.6a7.7 7.7 0 0 1 0 10.8"/><path class="x" d="M16 9.5l5 5M21 9.5l-5 5"/></svg></button><div>Total Δp<b id="idDp">–</b></div><div>Shaft<b id="idP">–</b></div><div>Cooling<b id="idQ">–</b></div><button class="dbadge" id="idAudit" type="button" data-igo="iaudit"></button></div>
   </div>
 </div>
 <div class="itoasts" id="itoasts" aria-live="polite"></div>
@@ -1550,6 +1563,7 @@ function K = Ke_2D_dikdortgen(p)
 end
 </script>
 
+<script src="sound.js"></script>
 <script>
 (function(){
 'use strict';
@@ -2698,6 +2712,8 @@ function update(){
   if(errs.length){ eh.innerHTML='<div class="errbox" role="alert"><b>Calculation paused. Fix the input:</b><ul>'+errs.map(e=>'<li>'+e+'</li>').join('')+'</ul></div>'; return; }
   eh.innerHTML='';
   R=compute(P); save();
+  /* sound: fan assumed at the diffuser exit with Ø = outlet, tip speed from Δp = ψ·½ρU² (ψ ≈ 0.35) */
+  if(window.SL_sound){ const U=Math.sqrt(2*R.dptot/(0.35*R.rho)); SL_sound.set('open',{V:R.V,shaft:U/(Math.PI*P.Dd*0.01),fans:1,spray:0}); }
   renderHero(R); renderBudget(R); renderNb(R); renderFlyCards(R);
   const g=JSON.stringify([P.nw,P.nh,P.Ln,P.tw,P.th,P.tL,P.Ld,P.Dd,P.N,P.mode,P.chord]);
   if(g!==update.g){
