@@ -292,10 +292,10 @@ void main(){float ph=fract((uT-vD.x)/uP);float puff=exp(-ph*2.2);
 float edge=1.0-smoothstep(0.35,1.0,abs(vS));
 float I=(0.30+0.70*puff)*(1.0-0.3*abs(vD.w))*edge;
 vec3 col=mix(uCa,uCb,smoothstep(0.08,1.0,vD.y));col=mix(col,uCh,vD.z*0.6);
-gl_FragColor=vec4(col,clamp(I,0.0,1.0));}`;
+float a=clamp(I,0.0,1.0);gl_FragColor=vec4(col*a,a);}`;
 function hex2rgb(h){ h=String(h).trim().replace('#',''); if(h.length===3) h=h.split('').map(c=>c+c).join(''); const n=parseInt(h,16); return [(n>>16&255)/255,(n>>8&255)/255,(n&255)/255]; }
 function makeGL(cv){
-  let gl=null; try{ gl=cv.getContext('webgl',{premultipliedAlpha:false,alpha:true,antialias:true}); }catch(_){}
+  let gl=null; try{ gl=cv.getContext('webgl',{premultipliedAlpha:true,alpha:true,antialias:true}); }catch(_){}
   if(!gl) return null;
   const hp=gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER,gl.HIGH_FLOAT), prec=(hp&&hp.precision>0)?'precision highp float;\n':'precision mediump float;\n';
   const sh=(t,src)=>{ const s=gl.createShader(t); gl.shaderSource(s,src); gl.compileShader(s); if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)){ console.warn(gl.getShaderInfoLog(s)); return null; } return s; };
@@ -315,7 +315,7 @@ function makeGL(cv){
     draw(cam,W,H,dpr,t,Pp,col){
       if(lost||!lanes) return;
       gl.viewport(0,0,cv.width,cv.height); gl.clearColor(0,0,0,0); gl.clear(gl.COLOR_BUFFER_BIT);
-      gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA,gl.ONE);
+      gl.enable(gl.BLEND); gl.blendFunc(gl.ONE,gl.ONE);
       gl.uniform3f(U.uCam,cam.ox,cam.oy,cam.k); gl.uniform2f(U.uRes,W,H); gl.uniform1f(U.uW,cam.lw||0.9);
       gl.uniform1f(U.uT,t); gl.uniform1f(U.uP,Pp);
       gl.uniform3fv(U.uCa,col.a); gl.uniform3fv(U.uCb,col.b); gl.uniform3fv(U.uCh,col.h);

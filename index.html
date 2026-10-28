@@ -2184,11 +2184,11 @@ void main(){
   float fade=1.0-plume*plume;
   float I=(line*(0.16+0.84*puff)+glow*puff)*fade;
   vec3 col=mix(uCa,uCb,smoothstep(0.2,1.0,ur));
-  gl_FragColor=vec4(col,clamp(I,0.0,1.0));
+  float a=clamp(I,0.0,1.0); gl_FragColor=vec4(col*a,a);
 }`;
 function makeGL(cv){
   let gl=null;
-  try{ gl=cv.getContext('webgl',{premultipliedAlpha:false,alpha:true,antialias:false}); }catch(_){}
+  try{ gl=cv.getContext('webgl',{premultipliedAlpha:true,alpha:true,antialias:false}); }catch(_){}
   if(!gl) return null;
   const hp=gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER,gl.HIGH_FLOAT);
   const prec=(hp&&hp.precision>0)?'precision highp float;\n':'precision mediump float;\n';

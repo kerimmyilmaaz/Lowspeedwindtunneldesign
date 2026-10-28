@@ -340,6 +340,12 @@ html.is-closed body{padding-bottom:calc(var(--idock-h,104px) + 12px)}
   .th-row{grid-template-columns:80px minmax(0,1fr) 78px}
   .fcurve .row{grid-template-columns:1fr}
   .ds-form .two{grid-template-columns:1fr}
+  /* close-up: keep the header to two lines so the camera keeps most of the phone screen */
+  .izoom .fly-head{padding-bottom:14px}
+  .izoom .fly-head .eyebrow,.izoom .iz-clock,.izoom .fly-skip{display:none}
+  .izoom .fly-head h2{font-size:21px}
+  .izoom .fly-head .in{gap:8px}
+  .izoom .fm-top{margin-bottom:4px}
   .ic-kv{grid-template-columns:1fr 1fr}
 }
 @media (prefers-reduced-motion:reduce){
