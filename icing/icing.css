@@ -87,6 +87,9 @@ html.is-closed body{padding-bottom:calc(var(--idock-h,104px) + 12px)}
 .irst.on::before{background:var(--h-ink);transform:scale(1.5)}
 .irst span{position:absolute;top:26px;left:50%;transform:translate(-50%,-4px);font:500 11px var(--f-body);white-space:nowrap;color:var(--h-ink);opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;background:var(--h-surface);border:1px solid var(--h-line);padding:3px 7px;border-radius:5px}
 .irst:hover span,.irst:focus-visible span{opacity:1;transform:translate(-50%,0)}
+/* the last labels open leftward so they never widen the page on phones */
+.irst:nth-last-child(-n+2) span{left:auto;right:0;transform:translate(0,-4px)}
+.irst:nth-last-child(-n+2):hover span,.irst:nth-last-child(-n+2):focus-visible span{transform:none}
 
 /* hero */
 .itunnel{position:relative;margin-top:clamp(18px,3vw,34px);width:100%;touch-action:pan-y}
@@ -332,6 +335,7 @@ html.is-closed body{padding-bottom:calc(var(--idock-h,104px) + 12px)}
 @media (max-width:900px){
   .ll-grid,.th-grid,.fan-grid,.ds-wrap{grid-template-columns:1fr}
   .ds-stage{order:-1}
+  .ds-stamp{right:2px}
 }
 @media (max-width:720px){
   .au-top{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -339,6 +343,10 @@ html.is-closed body{padding-bottom:calc(var(--idock-h,104px) + 12px)}
   .au-n:nth-child(n+3){border-top:1px solid var(--line)}
   .au-all{grid-column:1/-1;margin:10px 0}
   .au-b{padding-left:14px}
+  /* long readings ("vertical 5.9°, horizontal 5.9°") go under the title instead of squeezing it */
+  .au-c summary{grid-template-columns:22px minmax(0,1fr) 14px;grid-template-areas:"no tt ch" ". vv .";row-gap:4px}
+  .au-c .no{grid-area:no} .au-c .tt{grid-area:tt} .au-c .chev{grid-area:ch}
+  .au-c .vv{grid-area:vv;text-align:left;white-space:normal}
   .idock .dock-in{grid-template-columns:auto auto;grid-template-areas:"v t" "s s" "o o";gap:4px 12px}
   .idock .dt{justify-self:end}
   .idock .dout{gap:12px;justify-content:space-between;align-items:center}

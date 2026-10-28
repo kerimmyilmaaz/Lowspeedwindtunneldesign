@@ -190,10 +190,13 @@ html.has-cur .tip{display:none}
 .chip::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--h-muted);flex:none}
 .chip.ok::before{background:var(--ok)} .chip.warn::before{background:var(--warn)} .chip.bad::before{background:var(--bad)}
 .chip.warn{border-color:rgba(242,176,76,.45)} .chip.bad{border-color:rgba(255,122,107,.55)}
-.chip{flex-wrap:wrap}
+.chip > span .fixb{display:inline-block;margin:2px 0 2px 6px}
 .chip .fixb{font:600 11.5px var(--f-body);color:var(--h-ink);background:transparent;border:1px solid color-mix(in srgb,var(--h-ink) 28%,transparent);border-radius:999px;padding:2px 9px;cursor:pointer;transition:border-color .2s,background .2s}
 .chip .fixb::before{content:"↳ ";color:var(--h-muted)}
 .chip .fixb:hover,.chip .fixb:focus-visible{border-color:var(--h-ink);background:var(--h-line)}
+.chip.near{border-color:rgba(242,176,76,.28)}
+.chip.near::before{background:transparent;box-shadow:inset 0 0 0 2px var(--warn)}
+.nw{white-space:nowrap}
 .chip.undo{border-style:dashed}
 .chip.undo::before{background:var(--h-muted)}
 .chip.undo .fixb::before{content:"↶ "}
@@ -1770,7 +1773,10 @@ function renderHero(r){
   const fx=quickFixes(r);
   if(fx.mach) c[0].push(fx.mach);
   c[1].push(fx.cr);
-  c.push([r.thd<=3.5?'ok':'warn','Diffuser equivalent angle θe = '+nf(r.thd,2)+'°'+(r.thd<=3.5?'':' · separation risk, keep below ~3–3.5°'),fx.diff]);
+  /* Barlow p. 81 recommends θe ≤ 3° (as the MATLAB script warns); 3–3.5° is accepted in practice, so it is shown as marginal, not as an error */
+  c.push(r.thd<=3?['ok','Diffuser equivalent angle θe = '+nf(r.thd,2)+'° · within 3°']
+    :r.thd<=3.5?['near','Diffuser equivalent angle θe = '+nf(r.thd,2)+'° · near the limit, <span class="nw">3–3.5°</span> is acceptable']
+    :['warn','Diffuser equivalent angle θe = '+nf(r.thd,2)+'° · separation risk, keep below 3.5°',fx.diff]);
   if(P.mode==='auto'){
     const g=r.gap_cm; c.push([g>=2&&g<=3?'ok':(g<2?'bad':'warn'),'Boundary-layer gap '+nf(g,2)+' cm'+(g>=2&&g<=3?' · 2–3 cm satisfied':(g<2?' · below 2 cm':' · above 3 cm, conservative'))]);
     c.push(['ok','Solid blockage 5% · Maskell (1963)']);
@@ -1778,8 +1784,8 @@ function renderHero(r){
   if(r.Rew<400) c.push(['ok','Screen Re_w = '+nf(r.Rew,0)+' · K_Rn correction active']);
   FIXES=[];
   const fb=list=>(list||[]).map(f=>'<button type="button" class="fixb" data-fx="'+(FIXES.push(f)-1)+'" title="Apply this change">'+f.label+'</button>').join('');
-  $('#checks').innerHTML=(UNDO?'<li class="chip undo">Applied: '+UNDO.label+'<button type="button" class="fixb" data-undo>Undo</button></li>':'')+
-    c.map(x=>'<li class="chip '+x[0]+'">'+x[1]+fb(x[2])+'</li>').join('');
+  $('#checks').innerHTML=(UNDO?'<li class="chip undo"><span>Applied: '+UNDO.label+'<button type="button" class="fixb" data-undo>Undo</button></span></li>':'')+
+    c.map(x=>'<li class="chip '+x[0]+'"><span>'+x[1]+fb(x[2])+'</span></li>').join('');
   $('#dDp').textContent=nf(r.dptot,1)+' Pa';
   $('#dP').textContent=pw.v+' '+pw.u;
   const tk=['Re<sub>Dh</sub> <b>'+ni(r.Re)+'</b>','Mach <b>'+nf(r.M,3)+'</b>','q <b>'+nf(r.q,1)+' Pa</b>','Q <b>'+ni(r.Q*3600)+' m³/h</b>','ṁ <b>'+nf(r.mdot,3)+' kg/s</b>',
@@ -1922,7 +1928,7 @@ function nbData(r,p){
     ['Expansion loss',I('K')+'<sub>ex</sub> = '+I('K')+'<sub>e</sub> (('+I('AR')+' − 1)/'+I('AR')+')²',nf(r.Kex,5),'–'],
     ['Total coefficient',I('K')+'<sub>d</sub> = '+I('K')+'<sub>f</sub> + '+I('K')+'<sub>ex</sub>',nf(r.Kd,5),'–'],
     ['Pressure loss',I('Δp')+' = '+I('K')+'<sub>d</sub> · '+I('q'),nf(r.dp.diff,3),'Pa'],
-  ],note:'K_e is taken from the original Eckert, Mort & Jope relations (in 2θ). The square-section form printed as Barlow Eq. 3.29 contains typos; the corrected relations are continuous at 3° and 10°. For the square-to-circular transition the 3D (square + circular) and 2D averages are blended by the flatness ratio.'+(r.thd>3?' Warning: θ_e > 3° (Barlow p. 81), separation risk; K_e assumes attached flow.':'')+(r.AR>6?' Warning: AR > 6 (Barlow p. 81 suggests 5–6).':'')});
+  ],note:'K_e is taken from the original Eckert, Mort & Jope relations (in 2θ). The square-section form printed as Barlow Eq. 3.29 contains typos; the corrected relations are continuous at 3° and 10°. For the square-to-circular transition the 3D (square + circular) and 2D averages are blended by the flatness ratio.'+(r.thd>3.5?' Warning: θ_e > 3.5°, separation risk; K_e assumes attached flow.':r.thd>3?' Note: θ_e is between 3° (Barlow p. 81) and 3.5°, near the separation limit but acceptable.':'')+(r.AR>6?' Warning: AR > 6 (Barlow p. 81 suggests 5–6).':'')});
   S.push({sec:8,t:'Exit (dump) loss',ref:'B-R-P §3.3',k:'exit',res:'K = '+nf(r.Kexit,5),rows:[
     ['Exit velocity',I('V')+'<sub>exit</sub> = '+I('Q')+' / '+I('A')+'<sub>2</sub>',nf(r.Vexit,3),'m/s'],
     ['Loss coefficient',I('K')+'<sub>exit</sub> = 1 / '+I('AR')+'²',nf(r.Kexit,5),'–'],
