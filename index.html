@@ -1,8 +1,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script>/* pick the circuit tab before first paint (#icing = closed-circuit icing tunnel) */ if(/^#icing/.test(location.hash)) document.documentElement.classList.add('is-closed');</script>
 <title>Wind Tunnel Computation Sheet | Smokeline – Low-Speed Wind Tunnel Design Calculator</title>
-<meta name="description" content="Smokeline is a free, interactive wind tunnel computation sheet for low-speed, open-circuit wind tunnels: size the settling chamber, nozzle, test section and diffuser, compute the pressure loss budget and fan power (Barlow, Rae &amp; Pope), and export to MATLAB.">
-<meta name="keywords" content="wind tunnel computation sheet, wind tunnel calculator, wind tunnel design, low-speed wind tunnel, open circuit wind tunnel, pressure loss, Smokeline">
+<meta name="description" content="Smokeline is a free, interactive wind tunnel computation sheet. Open circuit: size the settling chamber, nozzle, test section and diffuser, compute the loss budget and fan power (Barlow, Rae &amp; Pope) and export to MATLAB. Closed circuit: design a closed-return icing wind tunnel with literature-based separation warnings, thermal budget and a PDF datasheet.">
+<meta name="keywords" content="wind tunnel computation sheet, wind tunnel calculator, wind tunnel design, low-speed wind tunnel, open circuit wind tunnel, closed circuit wind tunnel, icing wind tunnel, pressure loss, Smokeline">
 <link rel="canonical" href="https://windtunnel-theta.vercel.app/">
 <meta name="robots" content="index, follow">
 <meta property="og:type" content="website">
@@ -27,7 +28,7 @@
       "url": "https://windtunnel-theta.vercel.app/",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Any (web browser)",
-      "description": "Interactive computation sheet for sizing a low-speed, open-circuit wind tunnel and computing its component pressure losses and fan power.",
+      "description": "Interactive computation sheet for sizing a low-speed, open-circuit wind tunnel and a closed-circuit icing wind tunnel: component pressure losses, fan power, thermal budget, literature design checks and a PDF datasheet.",
       "author": {
         "@type": "Person",
         "name": "Kerim Yılmaz",
@@ -42,6 +43,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="icing/icing.css">
 <style>
 /* Layout: the page is the tunnel. A dark smoke-tunnel hero (WebGL) -> a pinned fly-through where scroll moves a camera from inlet to exit ->
    a theme-aware instrument bench (manometer budget, blueprint + inputs, notebook, sweep, MATLAB). Chapter jumps play a "gust" wipe whose
@@ -468,9 +470,11 @@ input[type=range]::-moz-range-thumb{width:12px;height:24px;border-radius:4px;bac
 }
 </style>
 
+<div id="appOpen">
 <nav class="rail lab" id="rail" aria-label="Chapters">
   <div class="rail-in">
     <a class="r-mark" href="#top" data-go="top">SMOKE<em>LINE</em></a>
+    <div class="cswitch sm" role="tablist" aria-label="Tunnel type" data-on="open"><a role="tab" href="./" data-circuit="open" aria-selected="true"><svg viewBox="0 0 22 12" aria-hidden="true"><path d="M1 2h5l4 3h4l7-3M1 10h5l4-3h4l7 3"/></svg><span class="cs-t">Open</span></a><a role="tab" href="#icing" data-circuit="closed" aria-selected="false"><svg viewBox="0 0 22 12" aria-hidden="true"><rect x="1" y="1" width="20" height="10" rx="2.5"/><path d="M6 6h10"/></svg><span class="cs-t">Icing</span></a><span class="cs-ind" aria-hidden="true"></span></div>
     <span class="r-ch" id="railCh"></span>
     <div class="r-track" id="railTrack"><svg id="railSvg" viewBox="0 0 1000 32" preserveAspectRatio="none" aria-hidden="true"></svg><span class="r-dot" id="railDot"></span></div>
   </div>
@@ -479,7 +483,7 @@ input[type=range]::-moz-range-thumb{width:12px;height:24px;border-radius:4px;bac
 <section class="hero lab" id="top" aria-labelledby="h1">
   <div class="wrap">
     <header class="top">
-      <div class="mark"><span class="wm">SMOKE<em>LINE</em></span><span class="ver">OPEN CIRCUIT · CLOSED TEST SECTION · 1D SIZING</span></div>
+      <div class="mark"><span class="wm">SMOKE<em>LINE</em></span><div class="cswitch" role="tablist" aria-label="Tunnel type" data-on="open"><a role="tab" href="./" data-circuit="open" aria-selected="true"><svg viewBox="0 0 22 12" aria-hidden="true"><path d="M1 2h5l4 3h4l7-3M1 10h5l4-3h4l7 3"/></svg><span class="cs-t">Open circuit</span></a><a role="tab" href="#icing" data-circuit="closed" aria-selected="false"><svg viewBox="0 0 22 12" aria-hidden="true"><rect x="1" y="1" width="20" height="10" rx="2.5"/><path d="M6 6h10"/></svg><span class="cs-t">Closed · Icing</span></a><span class="cs-ind" aria-hidden="true"></span></div><span class="ver">OPEN CIRCUIT · CLOSED TEST SECTION · 1D SIZING</span></div>
       <nav class="jump" aria-label="Sections">
         <a href="#fly" data-go="fly">Fly-through</a><a href="#loss" data-go="loss">Loss budget</a><a href="#geometry" data-go="geometry">Geometry</a><a href="#notebook" data-go="notebook">Notebook</a><a href="#sweep" data-go="sweep">Speed sweep</a><a href="#matlab" data-go="matlab">MATLAB</a><a href="#contact">Contact</a>
       </nav>
@@ -641,6 +645,229 @@ input[type=range]::-moz-range-thumb{width:12px;height:24px;border-radius:4px;bac
     <div class="dout"><div>Total Δp<b id="dDp">–</b></div><div>Fan power<b id="dP">–</b></div></div>
   </div>
 </div>
+</div><!-- /#appOpen -->
+
+<!-- ================= CLOSED CIRCUIT · ICING WIND TUNNEL ================= -->
+<div id="appClosed">
+<nav class="rail lab" id="irail" aria-label="Chapters (closed circuit)">
+  <div class="rail-in">
+    <a class="r-mark" href="#icing" data-igo="itop">SMOKE<em>LINE</em></a>
+    <div class="cswitch sm" role="tablist" aria-label="Tunnel type" data-on="closed"><a role="tab" href="./" data-circuit="open" aria-selected="false"><svg viewBox="0 0 22 12" aria-hidden="true"><path d="M1 2h5l4 3h4l7-3M1 10h5l4-3h4l7 3"/></svg><span class="cs-t">Open</span></a><a role="tab" href="#icing" data-circuit="closed" aria-selected="true"><svg viewBox="0 0 22 12" aria-hidden="true"><rect x="1" y="1" width="20" height="10" rx="2.5"/><path d="M6 6h10"/></svg><span class="cs-t">Icing</span></a><span class="cs-ind" aria-hidden="true"></span></div>
+    <span class="r-ch" id="irailCh"></span>
+    <div class="r-track" id="irailTrack"><svg id="irailSvg" viewBox="0 0 1000 32" preserveAspectRatio="none" aria-hidden="true"></svg><span class="r-dot" id="irailDot"></span></div>
+  </div>
+</nav>
+
+<section class="hero lab ihero" id="itop" aria-labelledby="ih1">
+  <div class="wrap">
+    <header class="top">
+      <div class="mark"><span class="wm">SMOKE<em>LINE</em></span><div class="cswitch" role="tablist" aria-label="Tunnel type" data-on="closed"><a role="tab" href="./" data-circuit="open" aria-selected="false"><svg viewBox="0 0 22 12" aria-hidden="true"><path d="M1 2h5l4 3h4l7-3M1 10h5l4-3h4l7 3"/></svg><span class="cs-t">Open circuit</span></a><a role="tab" href="#icing" data-circuit="closed" aria-selected="true"><svg viewBox="0 0 22 12" aria-hidden="true"><rect x="1" y="1" width="20" height="10" rx="2.5"/><path d="M6 6h10"/></svg><span class="cs-t">Closed · Icing</span></a><span class="cs-ind" aria-hidden="true"></span></div><span class="ver">CLOSED CIRCUIT · <b>ICING</b> · SINGLE RETURN · 1D SIZING</span></div>
+      <nav class="jump" aria-label="Sections (closed circuit)">
+        <a href="#icing" data-igo="izoom">Icing close-up</a><a href="#icing" data-igo="iaudit">Audit</a><a href="#icing" data-igo="iloss">Loss loop</a><a href="#icing" data-igo="igeo">Geometry</a><a href="#icing" data-igo="itherm">Thermal</a><a href="#icing" data-igo="ifan">Fans</a><a href="#icing" data-igo="isweep">Sweep</a><a href="#icing" data-igo="isheet">Datasheet</a>
+      </nav>
+    </header>
+    <div class="hero-head" id="iheroHead">
+      <h1 id="ih1"><span class="w-in">Recirculate.</span><span class="w-ex">Supercool.</span><span class="w-mid">Watch it freeze.</span></h1>
+      <p class="lede">A live computation sheet for a <b>closed-circuit icing wind tunnel</b>: one return leg, four vaned corners, a fan array, a wide-angle diffuser with the cooling coil, spray bars in the settling chamber. Change any dimension and every loss, the fan duty, the refrigeration load and a <b>literature-based design audit</b> update at once. Then export the tunnel as a PDF datasheet.</p>
+    </div>
+    <div class="itunnel" id="itunnel">
+      <canvas class="cvB" aria-hidden="true"></canvas>
+      <canvas class="cvG" aria-hidden="true"></canvas>
+      <canvas class="cvT" role="img" aria-label="Plan view of the closed circuit with smoke filaments and spray droplets"></canvas>
+      <div class="tip" id="itTip" hidden></div>
+    </div>
+    <div class="hint" id="itHint"></div>
+    <div class="readouts" id="ireadouts"></div>
+    <div id="ierr"></div>
+    <ul class="checks" id="ichecks" aria-label="Design audit summary"></ul>
+  </div>
+  <div class="ticker" aria-hidden="true"><div class="track" id="iticker"></div></div>
+</section>
+
+<section class="fly lab izoom" id="izoom" aria-labelledby="h-iz">
+  <div class="fly-sticky">
+    <div class="fly-stage" id="izStage">
+      <canvas class="cvB" aria-hidden="true"></canvas>
+      <canvas class="cvG" aria-hidden="true"></canvas>
+      <canvas class="cvT" role="img" aria-label="Close-up following the spray cloud through the circuit"></canvas>
+    </div>
+    <div class="fly-head"><div class="in">
+      <div><p class="eyebrow">Icing close-up · scroll to follow the spray cloud</p><h2 id="h-iz">From spray bar to ice horn</h2></div>
+      <div class="fly-meter"><div class="fm-top"><span>Ice at the stagnation line</span><b id="izIce">0.0 mm</b></div><div class="iz-bar"><span id="izBar"></span></div>
+        <div class="iz-clock"><span>Simulated spray time</span><b id="izClockT">0:00 min</b></div>
+        <svg class="fly-map" id="izMap" viewBox="0 0 1000 30" preserveAspectRatio="none" aria-hidden="true"></svg>
+        <button class="fly-skip" type="button" data-igo="iaudit">Skip to the design audit ↓</button></div>
+    </div></div>
+    <div class="fly-foot"><div class="in">
+      <div class="fly-col"><p class="fly-hint" id="izHint"><span class="ms" aria-hidden="true"></span>Keep scrolling: the camera follows the droplets round the loop.</p><div class="fly-cards" id="izCards"></div></div>
+      <ol class="fly-dots" id="izDots"></ol>
+    </div></div>
+  </div>
+</section>
+
+<div class="wrap">
+  <section class="blk" id="iaudit" aria-labelledby="h-iaudit">
+    <div class="shead"><div class="secno" aria-hidden="true">!</div><div>
+      <p class="eyebrow">Design audit · Barlow · Mehta &amp; Bradshaw · Bell &amp; Mehta · Bansmer</p>
+      <h2 id="h-iaudit" class="irv isplit">Will the flow stay attached?</h2>
+      <p class="sub irv" style="--i:2">Every edit is checked against published design rules: diffuser angles and area ratios for separation, screen and honeycomb proportions for flow quality, the wide-angle-diffuser resistance criterion, droplet supercooling, coil face velocity, fan fit, outer-skin condensation. Pins show where each issue sits in the circuit.</p>
+    </div></div>
+    <div class="au-top" id="iauTop"></div>
+    <div class="au-wrap">
+      <div class="au-map irv" id="iauMapWrap"><div id="iauMap"></div><div class="au-cap"><span>Plan · pins numbered as the list</span><span>hover a check to locate it</span></div></div>
+      <div class="au-list" id="iauList"></div>
+    </div>
+  </section>
+
+  <section class="blk" id="iloss" aria-labelledby="h-iloss">
+    <div class="shead"><div class="secno" aria-hidden="true">Δp</div><div>
+      <p class="eyebrow">kapali_devre_1D.m §3 · K_ref = K_local (A_TS/A)²</p>
+      <h2 id="h-iloss" class="irv isplit">The pressure loop</h2>
+      <p class="sub irv" style="--i:2">One lap of the circuit from the fan exit. Total pressure falls through every component and the fan lifts it back by exactly the circuit loss. The dashed static-pressure line dives in the test section, where the air is fastest.</p>
+    </div></div>
+    <div class="ll-chart irv" id="illChart"></div>
+    <div class="ll-leg" id="illLeg"></div>
+    <div class="ll-grid">
+      <div class="tscroll irv" style="margin-top:0"><table class="ktab" id="iktab" style="min-width:620px"></table></div>
+      <div class="fan irv" id="ifanTiles" style="margin-top:0;--i:2"></div>
+    </div>
+  </section>
+
+  <section class="blk" id="igeo" aria-labelledby="h-igeo">
+    <div class="shead"><div class="secno" aria-hidden="true">01</div><div>
+      <p class="eyebrow">kapali_devre_1D.m §1 · inputs</p>
+      <h2 id="h-igeo" class="irv isplit">Geometry and operating point</h2>
+      <p class="sub irv" style="--i:2">The circuit closes itself: short legs follow from the width H, and the upper straight duct from matching the two long legs. Focus a field and its part lights up on the plan; a coloured dot marks fields involved in an audit warning. Lengths in cm.</p>
+    </div></div>
+    <div class="igeo-wrap">
+      <div class="bp ibp irv" id="ibp"><div id="ibpSvg"></div><div class="bp-cap" id="ibpCap"></div></div>
+      <div>
+        <div class="geo" id="igeoGroups"></div>
+        <div class="geo-foot">
+          <button class="btn" id="ibtnReset" type="button">Restore project values</button>
+          <button class="btn" id="ibtnShare" type="button">Copy share link</button>
+          <span class="status" id="ishareStatus" role="status"></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="blk" id="itherm" aria-labelledby="h-itherm">
+    <div class="shead"><div class="secno" aria-hidden="true">°C</div><div>
+      <p class="eyebrow">kapali_devre_1D.m §6–7 · thermal budget · spray</p>
+      <h2 id="h-itherm" class="irv isplit">Thermal budget and icing cloud</h2>
+      <p class="sub irv" style="--i:2">All fan power ends up as heat in a closed loop. Add the walls and the latent heat of the spray water, and the coil has to remove it at a low evaporating temperature. On the right: what the cloud does at the model.</p>
+    </div></div>
+    <div class="th-grid">
+      <div><div class="th-bars irv" id="ithBars"></div><div class="ic-card irv" id="idrops" style="margin-top:16px;--i:2"></div></div>
+      <div class="th-side"><div class="ic-card irv" id="iicCard"></div><div class="ic-card irv" id="icond" style="--i:2"></div></div>
+    </div>
+  </section>
+
+  <section class="blk" id="ifan" aria-labelledby="h-ifan">
+    <div class="shead"><div class="secno" aria-hidden="true">×4</div><div>
+      <p class="eyebrow">kapali_devre_1D.m §3 · fan_rapor</p>
+      <h2 id="h-ifan" class="irv isplit">Fan array</h2>
+      <p class="sub irv" style="--i:2">A rectangular fan section with several small fans in parallel. Sizing numbers use the pressure coefficient ψ; paste a manufacturer curve to find the real operating point.</p>
+    </div></div>
+    <div class="fan-grid">
+      <div class="fan-face irv" id="ifanFace"></div>
+      <div>
+        <div class="fan irv" id="ifanTiles2" style="margin-top:0"></div>
+        <div class="fcurve irv" style="--i:2">
+          <h3>Manufacturer curve (per fan)</h3>
+          <div class="row">
+            <label>Q [m³/h]<textarea id="fcQ" rows="2" spellcheck="false"></textarea></label>
+            <label>Static Δp [Pa]<textarea id="fcdp" rows="2" spellcheck="false"></textarea></label>
+            <div style="display:grid;gap:8px"><label>Curve density [kg/m³]<input type="text" id="fcrho" inputmode="decimal"></label><label>Name<input type="text" id="fcname"></label></div>
+          </div>
+          <div class="chart" id="fcChart"><div class="ch"></div></div>
+          <div id="fcOut"></div>
+          <div class="geo-foot" style="margin-top:8px"><button class="btn" type="button" id="fcEx">Load example curve</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="blk" id="isweep" aria-labelledby="h-isweep">
+    <div class="shead"><div class="secno" aria-hidden="true">§5</div><div>
+      <p class="eyebrow">kapali_devre_1D.m §5 · system curve</p>
+      <h2 id="h-isweep" class="irv isplit">Speed sweep</h2>
+      <p class="sub irv" style="--i:2">Fixed geometry, 5 m/s steps. Loss coefficients fall slightly with speed as the Reynolds numbers grow, so Δp rises a little slower than V². Hover a chart to read values.</p>
+    </div></div>
+    <div class="charts">
+      <div class="chart irv" id="ichDp"><h3>Circuit Δp [Pa]</h3><div class="ch"></div></div>
+      <div class="chart irv" id="ichP" style="--i:2"><h3>Fan power [kW]</h3><div class="ch"></div></div>
+    </div>
+    <div class="tscroll irv"><table class="stab" id="istab" style="min-width:640px"></table></div>
+    <div class="geo-foot"><button class="btn" id="ibtnTsv" type="button">Copy table (paste into Excel)</button><span class="status" id="itsvStatus" role="status"></span></div>
+  </section>
+
+  <section class="blk" id="isheet" aria-labelledby="h-isheet">
+    <div class="shead"><div class="secno" aria-hidden="true">.pdf</div><div>
+      <p class="eyebrow">Datasheet · one design, one ID</p>
+      <h2 id="h-isheet" class="irv isplit">Take the tunnel with you</h2>
+      <p class="sub irv" style="--i:2">A multi-page technical datasheet of exactly this design: dimensions, velocities and Reynolds numbers, every loss, fan duty, mass flow, thermal budget, icing cloud, the full audit with references and the input record. It carries a design ID and a QR code that reopens this tunnel here.</p>
+    </div></div>
+    <div class="ds-wrap">
+      <div class="ds-stage irv"><div class="ds-stack" id="dsStack"></div><div class="ds-stamp">VECTOR PDF<br>A4 · QR-LINKED</div></div>
+      <div class="ds-form irv" style="--i:2">
+        <label class="ds-f">Project name<input id="dsName" placeholder="Icing wind tunnel" autocomplete="off"></label>
+        <div class="two"><label class="ds-f">Prepared by<input id="dsBy" autocomplete="off"></label><label class="ds-f">Organisation<input id="dsOrg" autocomplete="off"></label></div>
+        <div class="two"><label class="ds-f">Revision<input id="dsRev" value="A" autocomplete="off"></label><div class="ds-f">Contents<div class="ds-inc" id="dsInc">
+          <label><input type="checkbox" value="geo" checked>Geometry</label><label><input type="checkbox" value="loss" checked>Losses</label><label><input type="checkbox" value="therm" checked>Thermal</label><label><input type="checkbox" value="sweep" checked>Sweep</label><label><input type="checkbox" value="audit" checked>Audit</label><label><input type="checkbox" value="inputs" checked>Inputs</label></div></div></div>
+        <label class="ds-f">Notes (printed on the cover)<textarea id="dsNotes" placeholder="e.g. Coil data still estimated; vendor quote pending."></textarea></label>
+        <div class="ds-act">
+          <button class="btn pri big" id="dsExport" type="button"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Export datasheet PDF</button>
+          <button class="btn" id="dsLink" type="button">Copy link to this design</button>
+        </div>
+        <div class="ds-prog" id="dsProg"><span></span></div>
+        <div class="ds-id"><span id="dsId"></span> · <span class="status" id="dsStatus" role="status"></span></div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div>
+      <h4>References</h4>
+      <ol>
+        <li>Barlow, Rae &amp; Pope (1999). <i>Low-Speed Wind Tunnel Testing</i>, 3rd ed. Ch. 3.</li>
+        <li>Eckert, Mort &amp; Jope (1976). NASA TN D-8243, App. B (K_e).</li>
+        <li>Mehta &amp; Bradshaw (1979). Design rules for small low speed wind tunnels. Aero. J. 83.</li>
+        <li>Bell &amp; Mehta (1988). Contraction design for small low-speed wind tunnels. NASA CR-182747.</li>
+        <li>Bansmer et al. (2018). Braunschweig Icing Wind Tunnel. Atmos. Meas. Tech. 11.</li>
+        <li>Langmuir &amp; Blodgett (1946); Anderson (2004), NASA/CR-2004-212875.</li>
+      </ol>
+    </div>
+    <div>
+      <h4>Scope</h4>
+      <p>A one-dimensional preliminary design of a closed-circuit icing wind tunnel. The loss, fan and thermal logic is identical to the project's <span class="mono">kapali_devre_1D.m</span> v1.3; the audit rules and droplet impingement estimate are added on this page. It does not replace CFD, vendor data or calibration.</p>
+      <p><a href="https://github.com/kerimmyilmaaz/Lowspeedwindtunneldesign" target="_blank" rel="noopener">Project repository</a></p>
+    </div>
+    <div>
+      <h4>Contact</h4>
+      <p class="who">Kerim Yılmaz</p>
+      <p>Istanbul Technical University, Aeronautical Engineering Department</p>
+      <ul class="clinks">
+        <li><span>LinkedIn</span><a href="https://www.linkedin.com/in/kerim-y%C4%B1lmaz-094621216/" target="_blank" rel="noopener me">kerim-yılmaz</a></li>
+        <li><span>GitHub</span><a href="https://github.com/kerimmyilmaaz" target="_blank" rel="noopener me">kerimmyilmaaz</a></li>
+        <li><span>Open tab</span><a href="./" data-circuit="open" class="ifoot-n">Open-circuit smoke tunnel →</a></li>
+      </ul>
+    </div>
+  </footer>
+  <div class="bigmark" aria-hidden="true"><span>S</span><span>M</span><span>O</span><span>K</span><span>E</span><span class="o">L</span><span class="o">I</span><span class="o">N</span><span class="o">E</span></div>
+</div>
+
+<div class="dock idock" id="idock">
+  <div class="dock-in">
+    <div class="dv"><label for="idV">Test speed</label><div class="inp"><input id="idV" inputmode="decimal" autocomplete="off" aria-label="Test speed (m/s)"><span>m/s</span></div></div>
+    <div class="ds"><input type="range" id="idR" min="1" max="60" step="0.5" aria-label="Test speed slider"><div class="ticks"><span>1</span><span>15</span><span>30</span><span>45</span><span>60</span></div></div>
+    <div class="dv dt"><label for="idT">Static T</label><div class="inp"><input id="idT" inputmode="decimal" autocomplete="off" aria-label="Static temperature (°C)"><span>°C</span></div></div>
+    <div class="dout"><div>Total Δp<b id="idDp">–</b></div><div>Shaft<b id="idP">–</b></div><div>Cooling<b id="idQ">–</b></div><button class="dbadge" id="idAudit" type="button" data-igo="iaudit"></button></div>
+  </div>
+</div>
+<div class="itoasts" id="itoasts" aria-live="polite"></div>
+</div><!-- /#appClosed -->
 
 <div class="gust" id="gust" aria-hidden="true"><canvas id="gustCv"></canvas><div class="gust-t"><span class="ge" id="gustE"></span><span class="gn" id="gustN"></span></div></div>
 <div class="pcur" id="cur" aria-hidden="true"><span class="ring"></span></div>
@@ -2228,7 +2455,7 @@ function probe(v,clientX,clientY){
 /* ================= gust transition ================= */
 const gustEl=$('#gust'), gcv=$('#gustCv'), gctx=gcv.getContext('2d');
 let gusting=false;
-function gust(name,eyebrow,action){
+function gust(name,eyebrow,action,pal){
   if(RM.matches||gusting){ action(); return; }
   gusting=true;
   const W=innerWidth, H=innerHeight, dpr=Math.min(2,window.devicePixelRatio||1);
@@ -2239,7 +2466,8 @@ function gust(name,eyebrow,action){
   gustEl.classList.add('on');
   const Tin=560, Th=360, To=640, t0=performance.now(); let did=false;
   const ease=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
-  const bg=TH['h-bg'], ca=hex2rgb(TH['h-smoke-a']), cb=hex2rgb(TH['h-smoke-b']);
+  const bg=pal?pal.bg:TH['h-bg'], ca=hex2rgb(pal?pal.a:TH['h-smoke-a']), cb=hex2rgb(pal?pal.b:TH['h-smoke-b']);
+  gustEl.style.setProperty('--h-ink',pal?'#E4F3F8':''); gustEl.style.setProperty('--h-muted',pal?'#7E97A4':'');
   const col=(u,a)=>'rgba('+ca.map((c,i)=>Math.round(c+(cb[i]-c)*u)).join(',')+','+a+')';
   function frame(now){
     const e=now-t0; gctx.clearRect(0,0,W,H);
@@ -2345,7 +2573,10 @@ if(CUR){
     if(t.closest&&t.closest('input:not([type=range]):not([type=checkbox]),textarea')){ setCurMode('text'); return; }
     let v=null; if(HV&&t===HV.cvT) v=HV; else if(FV&&t===FV.cvT) v=FV;
     if(v){ const h=probe(v,mx,my); if(h&&h.inside){ setCurMode('probe'); curLab.textContent='u '+nf(h.u,1)+' m/s · '+COMP.find(c=>c.k===h.key).short; curLab.style.transform='translate('+(mx+18)+'px,'+(my+14)+'px)'; return; } }
-    setCurMode(t.closest&&t.closest('a,button,summary,[data-sec],[data-go],label,.an,input[type=range],input[type=checkbox]')?'link':'');
+    /* the closed-circuit tab (icing/app.js) reports its own canvas probe through this hook */
+    const ext=window.SL_probe&&window.SL_probe(t,mx,my);
+    if(ext){ setCurMode('probe'); curLab.textContent=ext; curLab.style.transform='translate('+(mx+18)+'px,'+(my+14)+'px)'; return; }
+    setCurMode(t.closest&&t.closest('a,button,summary,[data-sec],[data-go],[data-igo],label,.an,.pin,.llsg,input[type=range],input[type=checkbox]')?'link':'');
   });
   document.addEventListener('pointerleave',()=>{ mx=my=-100; });
   document.querySelectorAll('.btn,.jump a,.fc-go').forEach(attachMagnet);
@@ -2446,5 +2677,10 @@ setupReveals();
 renderSweep(R); renderMatlab(); blueprint();
 requestAnimationFrame(loop);
 if(document.fonts&&document.fonts.ready) document.fonts.ready.then(()=>{ measureDock(); if(TG){ layoutHero(); layoutFly(); } });
+/* shared with the closed-circuit tab: the gust transition, and a relayout when this tab is shown again
+   (it may have booted hidden, or under the frost palette) */
+window.SL={gust,relayout(){ readTheme(); measureDock(); if(TG){ layoutHero(); layoutFly(); buildRail(); } if(R){ renderSweep(R); blueprint(); } lastScroll=-1; }};
 })();
 </script>
+<script src="icing/engine.js"></script>
+<script src="icing/app.js"></script>
