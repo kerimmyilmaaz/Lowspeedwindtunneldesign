@@ -2681,16 +2681,19 @@ document.addEventListener('pointerover',e=>{ if(CUR&&e.target.classList&&e.targe
 function canvasClick(v){ return e=>{ const h=probe(v,e.clientX,e.clientY); if(h) openNb(h.sec); }; }
 
 /* ================= footer wordmark ================= */
+/* one wordmark per tab (open circuit builds its letters here, the icing footer has them in the HTML);
+   only the one on screen is animated */
 const BM=$('#bigmark');
 'SMOKELINE'.split('').forEach((ch,i)=>{ const s=document.createElement('span'); s.textContent=ch; if(i>=5) s.className='o'; BM.appendChild(s); });
-const BMS=[...BM.children]; let bmVisible=false;
-if('IntersectionObserver' in window) new IntersectionObserver(es=>{ bmVisible=es[0].isIntersecting; },{}).observe(BM);
+const BMARKS=[...document.querySelectorAll('.bigmark')].map(el=>({el,spans:[...el.children],vis:false}));
+if('IntersectionObserver' in window){ const io=new IntersectionObserver(es=>es.forEach(e=>{ const m=BMARKS.find(m=>m.el===e.target); if(m) m.vis=e.isIntersecting; }),{}); BMARKS.forEach(m=>io.observe(m.el)); }
 function updateBigmark(now){
-  if(!bmVisible||RM.matches) return;
-  const b=BM.getBoundingClientRect(); let cx;
-  if(CUR&&my>b.top-200&&my<b.bottom+200&&mx>0) cx=mx; else cx=b.left+b.width*(0.5+0.5*Math.sin(now/1400));
-  BMS.forEach(s=>{ const r=s.getBoundingClientRect(); const d=Math.abs(r.left+r.width/2-cx)/Math.max(120,b.width*0.18); const k=Math.exp(-d*d);
-    s.style.fontStretch=(78+47*k).toFixed(1)+'%'; s.style.fontWeight=String(Math.round(500+400*k)); });
+  if(RM.matches) return;
+  BMARKS.forEach(m=>{ if(!m.vis) return;
+    const b=m.el.getBoundingClientRect(); let cx;
+    if(CUR&&my>b.top-200&&my<b.bottom+200&&mx>0) cx=mx; else cx=b.left+b.width*(0.5+0.5*Math.sin(now/1400));
+    m.spans.forEach(s=>{ const r=s.getBoundingClientRect(); const d=Math.abs(r.left+r.width/2-cx)/Math.max(120,b.width*0.18); const k=Math.exp(-d*d);
+      s.style.fontStretch=(78+47*k).toFixed(1)+'%'; s.style.fontWeight=String(Math.round(500+400*k)); }); });
 }
 
 /* ================= main loop ================= */
