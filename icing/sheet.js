@@ -275,9 +275,10 @@ async function exportSheet(ST,O,prog){
       rw('Fan shaft power',nf(TB.fan/1000,2)+' kW',nf(TBs.fan/1000,2)+' kW'),rw('Motor losses'+(P.motorIn?' (motor in the stream)':' (outside)'),nf(TB.motor/1000,2)+' kW',nf(TBs.motor/1000,2)+' kW'),
       rw('Wall heat gain (lab '+nf(P.Tlab,0)+' °C, U '+nf(TB.U,3)+' W/m²K, '+nf(R.A_duvar,1)+' m²)',nf(TB.duvar/1000,2)+' kW',nf(TBs.duvar/1000,2)+' kW'),
       rw('Spray water, sensible + latent ('+nf(TB.m_su*3600,1)+' kg/h)',nf(TB.sprey/1000,2)+' kW',nf(TBs.sprey/1000,2)+' kW'),
+      ...(TB.ek>0?[rw('Atomising air and other loads (coil designer inputs)',nf(TB.ek/1000,2)+' kW',nf(TBs.ek/1000,2)+' kW')]:[]),
       Object.assign(rw('Total',nf(TB.top/1000,2)+' kW',nf(TBs.top/1000,2)+' kW'),{b:true}),Object.assign(rw('Refrigeration selection (×'+nf(P.tmarg,2)+')',nf(TB.sec/1000,2)+' kW',nf(TBs.sec/1000,2)+' kW'),{b:true,hl:true})]);
     /* stacked bar */
-    need(14); const parts=[['fan',C.k.fan],['motor',C.k.model],['duvar',C.k.duct],['sprey',C.k.hx]], mx=Math.max(TB.sec,TBs.sec);
+    need(14); const parts=[['fan',C.k.fan],['motor',C.k.model],['duvar',C.k.duct],['sprey',C.k.hx]].concat(TB.ek>0?[['ek',C.k.set||C.muted]]:[]), mx=Math.max(TB.sec,TBs.sec);
     [[TB,'S2 design'],[TBs,'S1']].forEach(([t,l])=>{ let x=M+24; font(FS,'normal',6.4,C.muted); T(l,M,y+2.6); parts.forEach(p=>{ const w=t[p[0]]/mx*(W-2*M-40); doc.setFillColor(p[1]); doc.rect(x,y,w,3.6,'F'); x+=w; }); doc.setDrawColor(C.muted); doc.setLineDashPattern([0.6,0.6],0); doc.rect(x,y,(t.sec-t.top)/mx*(W-2*M-40),3.6,'S'); doc.setLineDashPattern([],0); font(FM,'normal',6.4,C.ink); T(nf(t.sec/1000,2)+' kW',W-M,y+2.8,{align:'right'}); y+=5.6; });
     font(FS,'normal',5.8,C.muted); let lx=M+24; [['fan','fan shaft',C.k.fan],['motor','motor',C.k.model],['duvar','walls',C.k.duct],['sprey','spray water',C.k.hx]].forEach(p=>{ doc.setFillColor(p[2]); doc.rect(lx,y-2,2,2,'F'); T(p[1],lx+3,y-0.2); lx+=26; }); y+=5;
     para('The secondary fluid runs about '+nf(P.dTy,0)+' K below the air, near '+nf(IC.Tevap,0)+' °C (Bansmer et al. 2018: −32 °C fluid for −20 °C air), and the refrigerant evaporates lower still'+(IC.Tevap<-40?'; a single-stage unit does not reach this, a two-stage or cascade unit is needed':'')+'. Ask for capacity at the actual evaporating temperature.',7);

@@ -230,7 +230,8 @@ function thermal(R,G,LWC,h){
   const m_su=LWC*1e-3*R.Q;
   o.m_su=m_su;
   o.sprey=m_su*(4183*(G.sp.Tw-0)+334e3+2050*(0-T));
-  o.top=o.fan+o.motor+o.duvar+o.sprey; o.sec=o.top*G.tmarg;
+  o.ek=G.coil?G.coil.Q_at+G.coil.Q_oth:0;                     /* atomising air + other loads entered in the coil designer */
+  o.top=o.fan+o.motor+o.duvar+o.sprey+o.ek; o.sec=o.top*G.tmarg;
   return o;
 }
 
@@ -390,7 +391,7 @@ function deney(G,s,LWC,f,kose,Qk,C,UA,fm){
   const O=G.ops, Th=s.Tc, Rk=circuit(Object.assign({},G,{buz1:kose}),s.V,s.yer,s.h);
   const K0=s.R.K_top, Kc=Rk.K_top, Khx=Rk.hx.Kref*G.leak, sd=Rk.geo.s_dn, A_y=2*(sd/O.hatve)*sd*O.L_buz;
   const md=LWC*1e-3*s.V*Rk.A_TS, db=2*f*md/(O.rho_buz*A_y)/(O.hatve-O.t_kanat);
-  const qQ=Rk.q_TS*Rk.Q, Qsp=md*(4183*G.sp.Tw+334e3+2050*(0-Th)), dt=10;
+  const qQ=Rk.q_TS*Rk.Q, Qsp=md*(4183*G.sp.Tw+334e3+2050*(0-Th)), Qx=G.coil?G.coil.Q_at+G.coil.Q_oth:0, dt=10;
   let t=0, T=Th, Et=O.E_tampon, why='', b=0, lam=1;
   const ts=[], lams=[], Ts=[];
   for(;;){
@@ -400,7 +401,7 @@ function deney(G,s,LWC,f,kose,Qk,C,UA,fm){
     if(b>=O.b_max){ why='bmax'; break; }
     if(T-Th>=O.dT_izin){ why='dT'; break; }
     if(t>=O.t_max*60){ why='tmax'; break; }
-    const K=lam*K0, Pf=K*qQ/G.eta_fan*fm; let fz=Pf+UA*(G.Tlab-T)+Qsp-Qk;
+    const K=lam*K0, Pf=K*qQ/G.eta_fan*fm; let fz=Pf+UA*(G.Tlab-T)+Qsp+Qx-Qk;
     if(fz>0&&Et>0){ const d=Math.min(Et,fz*dt); Et-=d; fz-=d/dt; }
     T=fz>0?T+fz*dt/C:Math.max(Th,T+fz*dt/C); t+=dt;
   }
@@ -415,7 +416,7 @@ function ops(G,SN){
   const C=Cb.shell+Cb.ins+Cb.hx+Cb.inner+Cb.air, fm=G.motorIn?1/G.eta_m:1, Qk=O.Q_sec;
   /* 1) steady refrigeration load at the target temperature */
   const load=SN.map(s=>{ const R=s.R, Pf0=R.P_mil*fm, PfL=G.buz.lamF*Pf0, Qd=UA*(G.Tlab-s.Tc);
-    return [0].concat(O.LWC).map(L=>{ const md=L*1e-3*R.Q, Qsp=md*(4183*G.sp.Tw+334e3+2050*(0-s.Tc)); return {LWC:L,Pf0,PfL,Qd,Qsp,tot:Pf0+Qd+Qsp,totL:PfL+Qd+Qsp}; }); });
+    return [0].concat(O.LWC).map(L=>{ const md=L*1e-3*R.Q, Qsp=md*(4183*G.sp.Tw+334e3+2050*(0-s.Tc)); const Qx=G.coil?(L>0?G.coil.Q_at:0)+G.coil.Q_oth:0; return {LWC:L,Pf0,PfL,Qd,Qsp,Qx,tot:Pf0+Qd+Qsp+Qx,totL:PfL+Qd+Qsp+Qx}; }); });
   /* 2) initial cool-down from the lab temperature; the moisture of the loop air freezes out on the coil once */
   const E_nem=(R1.hacim*1.2*O.w0)*(2.501e6+334e3);
   const cool=SN.map(s=>{ const Pf=circuit(G,O.V_sog,s.yer,s.h).P_mil*fm, Ceff=C+E_nem/(G.Tlab-s.Tc);

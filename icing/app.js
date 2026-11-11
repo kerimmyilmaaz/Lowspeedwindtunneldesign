@@ -1128,7 +1128,7 @@ function vanesAll(){ return PT.segs.filter(q=>q.t==='C').map(q=>vanes(q)).flat()
 /* ================= render: thermal ================= */
 function renderThermal(){
   const R=S.R, TB=S.TB, TBs=S.TBs, IC=S.IC, mx=Math.max(TB.sec,TBs.sec);
-  const parts=[['fan','Fan shaft','k-fan'],['motor','Motor losses','k-model'],['duvar','Walls','k-duct'],['sprey','Spray water','k-hx']];
+  const parts=[['fan','Fan shaft','k-fan'],['motor','Motor losses','k-model'],['duvar','Walls','k-duct'],['sprey','Spray water','k-hx']].concat(TB.ek>0?[['ek','Atomising air and other loads','k-set']]:[]);
   const row=(lab,sub,t)=>'<div class="th-row"><div class="l">'+lab+'<small>'+sub+'</small></div><div class="th-st">'+parts.map(p=>'<span title="'+p[1]+' '+kW(t[p[0]]).v+' '+kW(t[p[0]]).u+'" style="width:'+(t[p[0]]/mx*100).toFixed(2)+'%;background:var(--'+p[2]+')"></span>').join('')+
     '<span title="margin" style="width:'+((t.sec-t.top)/mx*100).toFixed(2)+'%;background:repeating-linear-gradient(135deg,var(--line) 0 4px,transparent 4px 8px)"></span></div><div class="v">'+kW(t.sec).v+'<small>'+kW(t.sec).u+'</small></div></div>';
   $('#ithBars').innerHTML=row('S2 · design',nf(P.V,0)+' m/s · '+nf(P.LWC,1)+' g/m³',TB)+row('S1',nf(P.Vs,0)+' m/s · '+nf(P.LWCs,1)+' g/m³',TBs)+

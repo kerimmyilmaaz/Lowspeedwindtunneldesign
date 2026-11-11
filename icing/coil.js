@@ -118,13 +118,13 @@ function rate(G,g,air,mdot,Tout,Q,dIceFront){
 /* steady heat load at the target temperature, same terms as E.ops: fan (+ motor), walls, spray water */
 function coilLoad(G,R,Tc,LWC){
   const fm=G.motorIn?1/G.eta_m:1, U=1/(1/G.ins.hi+G.ins.t/G.ins.k+1/G.ins.ho), Pf0=R.P_mil*fm, md=LWC*1e-3*R.Q;
-  return {Pf0,PfL:G.buz.lamF*Pf0,Qd:U*R.A_duvar*(G.Tlab-Tc),Qsp:md*(4183*G.sp.Tw+334e3+2050*(0-Tc))};
+  return {Pf0,PfL:G.buz.lamF*Pf0,Qd:U*R.A_duvar*(G.Tlab-Tc),Qsp:md*(4183*G.sp.Tw+334e3+2050*(0-Tc)),Qx:G.coil.Q_at+G.coil.Q_oth};
 }
 /* full result for a scenario s = {V, Tc, h, R} at the cloud LWC [g/m3] */
 function coil(G,s,LWC){
   const c=G.coil, R=s.R, g=geometry(G,R), h=s.h, load=coilLoad(G,R,s.Tc,LWC);
   const T0=s.Tc+s.V*s.V/(2*CP), air=Object.assign(E.air(T0,h.p),{});       /* settling-chamber air ≈ total temperature */
-  const mdot=R.mdot, extra=c.Q_at+c.Q_oth;
+  const mdot=R.mdot, extra=load.Qx;
   const Qc=load.Pf0+load.Qd+load.Qsp+extra, Qi=load.PfL+load.Qd+load.Qsp+extra;
   /* leading-edge ice: flux on the face, horn width w(t) on the front-stage fin edges [T] */
   const fp=g.stages[0].fp, q_w=c.f_w*LWC*1e-3*s.V*R.A_TS/g.A_face, dwdt=q_w/(2*c.crho), span=fp-c.tf;
@@ -175,7 +175,7 @@ function coilAudit(C,G,P){
       msg:'Ice grows as horns on the leading edges of the front-stage fins and closes the '+n((C.g.stages[0].fp-c.tf)*1000,1)+' mm gap. The run ends at blockage '+n(c.b_def,2)+' or when the circuit loss reaches λ_fan, whichever comes first. Preliminary model calibrated on NASA TM-100116; fit it to your own coil once it runs.',
       fix:'Open the front-stage fin pitch, or enlarge the coil face area.',refs:['NA2','FIN'],fields:['cFp1','fsu','CR']}); }
   if(c.Q_at+c.Q_oth<=0) add({id:'coilLoad',sev:'info',title:'Loads not yet in the budget',val:'0 kW entered',lim:'—',
-    msg:'Atomising air of the spray nozzles, secondary-pump heat and thermal bridges (flanges, windows, doors) are not in the thermal budget. Together they are typically a few kW.',
+    msg:'Atomising air of the spray nozzles and thermal bridges (flanges, windows, doors) are not in the thermal budget yet; together they are typically a few kW. Secondary-pump heat does not reach the tunnel air but adds to the chiller load.',
     fix:'Enter the atomising-air load from the nozzle datasheet (air mass flow × c_p × temperature difference) and the other loads once known.',refs:['BS'],fields:['cQat','cQot']});
   if(P&&P.cMu===15&&P.cRho===1300&&P.cCp===2700&&P.cKfl===0.45) add({id:'coilFluid',sev:'info',title:'Secondary fluid properties are placeholders',val:'ρ, c_p, μ, k not from a datasheet',lim:'—',
     msg:'The fluid properties are round placeholder numbers. Viscosity at the operating temperature decides the tube-side regime and with it the fluid temperature the coil needs.',
