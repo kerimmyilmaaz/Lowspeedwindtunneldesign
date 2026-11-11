@@ -18,8 +18,15 @@
    [FIN] collection efficiency of a cylinder, Finstad, Lozowski & Gates (1988); coefficients verified from
          Finstad's 1986 thesis (Eq. II.1-II.2, Table II.6).
    [MS]  rime density, Makkonen & Stallabrass (1984): rho = 378 + 425 log R - 82.3 (log R)^2, R = -r V0 / Ts.
-   [T]   leading-edge horn blockage: project model calibrated on NASA TM-100116 (c rho_ice ~ 540 kg/m3,
-         n_e ~ 1.1-1.4). A preliminary model until it is fitted to measurements on the actual coil. */
+   [T]   leading-edge horn blockage: the project's own model. c rho_ice ~ 540 kg/m3 and n_e ~ 1.1-1.4 were fitted to
+         a single observation in NASA TM-100116 (about 4 mm horn width after 39 corrected minutes) on a different
+         coil (0.78 mm galvanised fins, 8.5 mm pitch). A hypothesis, not a design value, until it is fitted to
+         measurements on the actual coil. Growth assumes collection efficiency 1, which overestimates the rate as
+         the horn widens.
+   Cross-flow effectiveness (both fluids unmixed) for circuits with fewer than four passes: the usual approximation
+   eps = 1 - exp[(NTU^0.22/Cr)(exp(-Cr NTU^0.78) - 1)] as given by Incropera. Textbook form.
+   Fluid side: the stages are in series (main-stage outlet header piped to the front-stage inlet header), so every
+   circuit runs through all rows; staggered rows keep the same tube count and are offset by +/- a quarter pitch. */
 (function(){
 'use strict';
 const E=window.IcingEngine; if(!E) return;
@@ -71,11 +78,12 @@ function geometry(G,R){
     return Object.assign(s,{nfin,A_fin,A_t0,A_tube,A_o,sig,depth:s.rows*c.Pl,A_i:s.rows*Nt*Math.PI*Di*W,
       m_fin:nfin*s.rows*cell*c.tf*c.rho_fin});
   });
-  const rows=stages.reduce((a,s)=>a+s.rows,0), tubes=rows*Nt, Ncirc=c.Ncirc>0?Math.min(c.Ncirc,tubes):Nt;
+  const rows=stages.reduce((a,s)=>a+s.rows,0), tubes=rows*Nt, want=c.Ncirc>0?Math.min(c.Ncirc,tubes):Nt;
+  let Ncirc=1; for(let d=1;d<=tubes;d++) if(tubes%d===0&&Math.abs(d-want)<Math.abs(Ncirc-want)) Ncirc=d;   /* whole passes only */
   const passes=tubes/Ncirc, L_circ=passes*W, depth=stages.reduce((a,s)=>a+s.depth,0)+(stages.length>1?c.gap:0);
   const m_tube=tubes*W*Math.PI/4*(c.Do*c.Do-Di*Di)*c.rho_tube, m_fin=stages.reduce((a,s)=>a+s.m_fin,0);
   const V_fluid=tubes*W*Math.PI/4*Di*Di;
-  return {W,H,A_face:W*H,Di,Nt,stag,Pd,stages,rows,tubes,Ncirc,passes,L_circ,depth,m_tube,m_fin,m_metal:m_tube+m_fin,V_fluid,
+  return {W,H,A_face:W*H,Di,Nt,stag,Pd,stages,rows,tubes,Ncirc,Nwant:want,passes,L_circ,depth,m_tube,m_fin,m_metal:m_tube+m_fin,V_fluid,
     A_o:stages.reduce((a,s)=>a+s.A_o,0),A_i:stages.reduce((a,s)=>a+s.A_i,0),nfin:stages.reduce((a,s)=>a+s.nfin,0)};
 }
 
@@ -101,24 +109,26 @@ function airSide(G,g,s,air,Vf,dIce){
 /* one thermal case: load Q [W] removed by the coil, mdot air, uniform ice layer on the front stage */
 function rate(G,g,air,mdot,Tout,Q,dIceFront){
   const c=G.coil, Vf=mdot/(air.rho*g.A_face);
-  const st=g.stages.map(s=>Object.assign({id:s.id,name:s.name},airSide(G,g,s,air,Vf,s.id==='front'?dIceFront:0)));
+  const st=g.stages.map((s,ix)=>Object.assign({id:s.id,name:s.name},airSide(G,g,s,air,Vf,ix===0?dIceFront:0)));
   const UA_air=st.reduce((a,s)=>a+s.UA,0), dp_air=st.reduce((a,s)=>a+s.dp,0);
   const mf=Q/(c.f_cp*c.dTf), Ai1=Math.PI/4*g.Di*g.Di, v=mf/(g.Ncirc*c.f_rho*Ai1), Re=c.f_rho*v*g.Di/c.f_mu, Pr=c.f_mu*c.f_cp/c.f_k;
   const ts=tubeSide(Re,Pr,g.Di,g.L_circ), hi=ts.Nu*c.f_k/g.Di, UA_i=hi*g.A_i;
   const R_w=Math.log(c.Do/g.Di)/(2*Math.PI*c.k_tube*g.tubes*g.W);
   const UA=1/(1/UA_air+R_w+1/UA_i);
   const Ca=mdot*CP, Cf=mf*c.f_cp, Cmin=Math.min(Ca,Cf), Cr=Cmin/Math.max(Ca,Cf), NTU=UA/Cmin;
-  const eps=Math.abs(1-Cr)<1e-6?NTU/(1+NTU):(1-Math.exp(-NTU*(1-Cr)))/(1-Cr*Math.exp(-NTU*(1-Cr)));
+  const counter=g.passes>=4;
+  const eps=counter?(Math.abs(1-Cr)<1e-6?NTU/(1+NTU):(1-Math.exp(-NTU*(1-Cr)))/(1-Cr*Math.exp(-NTU*(1-Cr)))):
+    1-Math.exp(Math.pow(NTU,0.22)/Cr*(Math.exp(-Cr*Math.pow(NTU,0.78))-1));
   const Tin=Tout+Q/Ca, Tf_in=Tin-Q/(eps*Cmin), Tf_out=Tf_in+c.dTf;
   const nb=Math.max(0,g.passes-1), dp_f=(ts.f*g.L_circ/g.Di+c.K_bend*nb+1.5)*0.5*c.f_rho*v*v, Vdot=mf/c.f_rho;
-  return {Q,Vf,st,UA_air,UA_i,R_w,UA,NTU,eps,Cr,Tin,Tout,dT_air:Q/Ca,mf,Vdot,v,Re,Pr,regime:ts.regime,Nu_i:ts.Nu,hi,Tf_in,Tf_out,
+  return {Q,Vf,st,UA_air,UA_i,R_w,UA,NTU,eps,counter,Cr,Tin,Tout,dT_air:Q/Ca,mf,Vdot,v,Re,Pr,regime:ts.regime,Nu_i:ts.Nu,hi,Tf_in,Tf_out,
     dp_air,dp_f,P_pump:dp_f*Vdot,share:{air:(1/UA_air)*UA,wall:R_w*UA,tube:(1/UA_i)*UA}};
 }
 
 /* steady heat load at the target temperature, same terms as E.ops: fan (+ motor), walls, spray water */
 function coilLoad(G,R,Tc,LWC){
   const fm=G.motorIn?1/G.eta_m:1, U=1/(1/G.ins.hi+G.ins.t/G.ins.k+1/G.ins.ho), Pf0=R.P_mil*fm, md=LWC*1e-3*R.Q;
-  return {Pf0,PfL:G.buz.lamF*Pf0,Qd:U*R.A_duvar*(G.Tlab-Tc),Qsp:md*(4183*G.sp.Tw+334e3+2050*(0-Tc)),Qx:G.coil.Q_at+G.coil.Q_oth};
+  return {Pf0,PfL:G.buz.lamF*Pf0,Qd:U*R.A_duvar*(G.Tlab-Tc),Qsp:md*(4183*G.sp.Tw+334e3+2050*(0-Tc)),Qx:(LWC>0?G.coil.Q_at:0)+G.coil.Q_oth};
 }
 /* full result for a scenario s = {V, Tc, h, R} at the cloud LWC [g/m3] */
 function coil(G,s,LWC){
@@ -134,15 +144,15 @@ function coil(G,s,LWC){
   const bLam=Khx>0?1-Math.pow(1+(G.buz.lamF-1)*K0/Khx,-1/c.n_e):1, t_lam=tB(bLam), t_def=tB(c.b_def);
   const t_end=Math.min(t_lam,t_def), iceMass=t=>q_w*g.A_face*t, dIce=t=>iceMass(t)/(c.rho_ice*g.stages[0].A_o);
   const tRef=isFinite(t_end)?t_end:3600;
-  const clean=rate(G,g,air,mdot,T0,Qc,0), iced=rate(G,g,air,mdot,T0,Qi,dIce(tRef));
+  const clean=rate(G,g,air,mdot,T0,Qc,0), iced=rate(G,g,air,mdot,T0,Qi,dIce(tRef)), UA_loss=1-iced.UA/rate(G,g,air,mdot,T0,Qi,0).UA;
   /* droplet capture on the bare fin edge, a 4 mm iced edge and the first tube row [FIN] */
   const d=G.MVD*1e-6, Vf=clean.Vf, cap={edge:finstad(d,c.tf,Vf,air.rho,air.mu),edge4:finstad(d,4e-3,Vf,air.rho,air.mu),tube:finstad(d,c.Do,Vf,air.rho,air.mu)};
   const Ts=clean.Tf_in+0.5*c.dTf+0.5*(T0-clean.Tf_in), ms=rimeDensity(G.MVD,Vf,Math.min(-0.5,Ts));
   /* λ(t) curve for the chart */
-  const tmax=Math.min(isFinite(t_end)?t_end*1.25:7200,4*3600), ts=[], lams=[], bs=[];
+  const tmax=Math.min(isFinite(t_end)&&t_end>60?t_end*1.25:7200,4*3600), ts=[], lams=[], bs=[];
   for(let i=0;i<=60;i++){ const t=tmax*i/60; ts.push(t); bs.push(bAt(t)); lams.push(bAt(t)>=0.995?NaN:lamAt(t)); }
   const dp_in=R.hx.dp, T_assumed=s.Tc-G.ops.dTy;
-  return {g,T0,air,mdot,extra,load,Qc,Qi,clean,iced,T_assumed,dp_in,q_w,dwdt,bAt,lamAt,t_lam,t_def,t_end,bLam,iceMass,dIce,cap,ms,
+  return {g,T0,air,mdot,extra,load,Qc,Qi,clean,iced,UA_loss,T_assumed,dp_in,q_w,dwdt,bAt,lamAt,t_lam,t_def,t_end,bLam,iceMass,dIce,cap,ms,
     curve:{ts,lams,bs},wAt:t=>c.tf+dwdt*t,LWC};
 }
 
@@ -150,18 +160,29 @@ function coil(G,s,LWC){
 function coilAudit(C,G,P){
   const out=[], add=o=>out.push(Object.assign({cat:'Coil',where:'hx',refs:[],fields:[],msg:'',fix:''},o));
   const n=(x,d)=>isFinite(x)?x.toFixed(d):'—', c=G.coil, k=C.clean, i=C.iced;
-  { const d=C.T_assumed-i.Tf_in, sev=d>3?'bad':d>0.5?'warn':'ok';
+  /* placeholder fluid: at least three of the four properties still at their defaults */
+  const ph=!!P&&[P.cMu===15,P.cRho===1300,P.cCp===2700,P.cKfl===0.45].filter(Boolean).length>=3;
+  const cap=s=>ph&&(s==='bad'||s==='warn')?'info':s, phNote=ph?' Rated with placeholder fluid properties, so this is shown as a note; with the datasheet values it becomes a decisive check.':'';
+  { const d=C.T_assumed-i.Tf_in, raw=d>3?'bad':d>0.5?'warn':'ok', sev=cap(raw);
     add({id:'coilT',sev,title:'Fluid temperature the coil needs',val:n(i.Tf_in,1)+' °C at the iced load',lim:'≥ '+n(C.T_assumed,1)+' °C assumed (air − ΔT approach)',
-      msg:sev==='ok'?'With this surface and tube-side film the coil removes '+n(i.Q/1000,1)+' kW with the fluid entering at '+n(i.Tf_in,1)+' °C; the approach assumed in the operating cycle holds.':
-        'To remove '+n(i.Q/1000,1)+' kW this coil needs the fluid '+n(d,1)+' K colder than the operating cycle assumes. The refrigeration unit would have to be rated at the lower temperature, where its capacity drops.',
+      msg:raw==='ok'?'With this surface and tube-side film the coil removes '+n(i.Q/1000,1)+' kW with the fluid entering at '+n(i.Tf_in,1)+' °C; the approach assumed in the operating cycle holds.':
+        'To remove '+n(i.Q/1000,1)+' kW this coil needs the fluid '+n(d,1)+' K colder than the operating cycle assumes. The refrigeration unit would have to be rated at the lower temperature, where its capacity drops.'+phNote,
       fix:'Add rows or fin surface, raise the tube-side film (fewer parallel circuits, lower-viscosity fluid), or raise the approach ΔT in the operating cycle and rate the chiller there.',
       refs:['VDI','SCH','GN'],fields:['cN2','cFp2','cNc','cMu','dTy']}); }
-  { const sev=i.regime==='laminar'?'warn':i.regime==='transitional'?'info':'ok';
+  { const raw=i.regime==='laminar'?'warn':i.regime==='transitional'?'info':'ok', sev=cap(raw);
     add({id:'coilRe',sev,title:'Tube-side flow regime',val:'Re '+n(i.Re,0)+' · '+i.regime,lim:'turbulent, Re > 4000',
-      msg:sev==='ok'?'Turbulent flow in the tubes: film coefficient '+n(i.hi,0)+' W/m²K, '+n(i.share.tube*100,0)+'% of the total resistance.':
-        'At this temperature the fluid is viscous and the tube flow is '+i.regime+': film coefficient only '+n(i.hi,0)+' W/m²K, '+n(i.share.tube*100,0)+'% of the total resistance sits inside the tubes.',
+      msg:raw==='ok'?'Turbulent flow in the tubes: film coefficient '+n(i.hi,0)+' W/m²K, '+n(i.share.tube*100,0)+'% of the total resistance.':
+        'At this temperature the fluid is viscous and the tube flow is '+i.regime+': film coefficient only '+n(i.hi,0)+' W/m²K, '+n(i.share.tube*100,0)+'% of the total resistance sits inside the tubes.'+phNote,
       fix:'Use fewer parallel circuits (higher velocity, at the cost of pump head), a smaller fluid temperature rise, or a fluid with lower viscosity at this temperature.',
       refs:['GN'],fields:['cNc','cdTf','cMu']}); }
+  { const kPa=i.dp_f/1000, sev=(kPa>300||i.v>4)?'bad':(kPa>150||i.v>2.5)?'warn':'ok';
+    add({id:'coilDpf',sev,title:'Tube-side pressure drop and velocity',val:n(kPa,0)+' kPa · '+n(i.v,2)+' m/s',lim:'≤ 150 kPa and ≤ 2.5 m/s (rule of thumb)',
+      msg:sev==='ok'?'Tube velocity and pressure drop are in the usual range for a pumped secondary circuit. The limits are a rule of thumb, not a literature value; the pump and the manufacturer decide.':
+        'Each circuit carries too much flow: '+n(i.v,2)+' m/s and '+n(kPa,0)+' kPa across the coil ('+n(i.P_pump/1000,2)+' kW hydraulic). The limits are a rule of thumb, not a literature value, but a pump for this is impractical.',
+      fix:'More parallel circuits or a larger fluid temperature rise.',refs:['GN'],fields:['cNc','cdTf']}); }
+  if(!i.counter) add({id:'coilPass',sev:'warn',title:'Too few passes for counter-flow',val:n(C.g.passes,0)+' pass'+(C.g.passes>1?'es':'')+' per circuit',lim:'≥ 4 passes',
+    msg:'With fewer than four passes a circuit does not cross the air stream often enough to behave as counter-flow. The rating switches to the cross-flow effectiveness, which needs a colder fluid.',
+    fix:'Fewer parallel circuits, so that each one serpentines through at least four rows.',refs:[],fields:['cNc']});
   { const e=Math.min(...k.st.map(s=>s.eta)), sev=e<0.5?'warn':'ok';
     add({id:'coilFin',sev,title:'Fin efficiency',val:n(e,2),lim:'≥ 0.5',
       msg:e<0.5?'More than half of the fin surface is not working: the fin is too thin or the tubes are too far apart for this film coefficient.':'The fins conduct well enough for the tube spacing.',
@@ -172,12 +193,12 @@ function coilAudit(C,G,P){
       fix:'Ask the vendor for the clean air-side Δp at this face velocity and enter it as the coil Δp.',refs:['JK'],fields:['hxdp','hxV']}); }
   { const t=C.t_end/60, sev=t<10?'warn':t<20?'info':'ok';
     add({id:'coilIce',sev,title:'Spray time to the defrost trigger',val:isFinite(t)?n(t,0)+' min at '+n(C.LWC,1)+' g/m³':'not reached',lim:'≥ 10 min spray run',
-      msg:'Ice grows as horns on the leading edges of the front-stage fins and closes the '+n((C.g.stages[0].fp-c.tf)*1000,1)+' mm gap. The run ends at blockage '+n(c.b_def,2)+' or when the circuit loss reaches λ_fan, whichever comes first. Preliminary model calibrated on NASA TM-100116; fit it to your own coil once it runs.',
-      fix:'Open the front-stage fin pitch, or enlarge the coil face area.',refs:['NA2','FIN'],fields:['cFp1','fsu','CR']}); }
+      msg:'Ice grows as horns on the leading edges of the front-stage fins and closes the '+n((C.g.stages[0].fp-c.tf)*1000,1)+' mm gap. The run ends at blockage '+n(c.b_def,2)+' or when the circuit loss reaches λ_fan, whichever comes first. This is the project\'s own preliminary model: its two constants were fitted to one observation in NASA TM-100116 on a different coil, and growth assumes every droplet in the path of the edge sticks. Fit it to your own coil once it runs.',
+      fix:'Open the front-stage fin pitch, or enlarge the coil face area.',refs:['NA2'],fields:['cFp1','fsu','CR']}); }
   if(c.Q_at+c.Q_oth<=0) add({id:'coilLoad',sev:'info',title:'Loads not yet in the budget',val:'0 kW entered',lim:'—',
-    msg:'Atomising air of the spray nozzles and thermal bridges (flanges, windows, doors) are not in the thermal budget yet; together they are typically a few kW. Secondary-pump heat does not reach the tunnel air but adds to the chiller load.',
-    fix:'Enter the atomising-air load from the nozzle datasheet (air mass flow × c_p × temperature difference) and the other loads once known.',refs:['BS'],fields:['cQat','cQot']});
-  if(P&&P.cMu===15&&P.cRho===1300&&P.cCp===2700&&P.cKfl===0.45) add({id:'coilFluid',sev:'info',title:'Secondary fluid properties are placeholders',val:'ρ, c_p, μ, k not from a datasheet',lim:'—',
+    msg:'Atomising air of the spray nozzles and thermal bridges (flanges, windows, doors) are not in the thermal budget yet. Their size is not known until the nozzles and the structure are chosen. Secondary-pump heat does not reach the tunnel air; add it to the chiller load, not here.',
+    fix:'Enter the atomising-air load from the nozzle datasheet (air mass flow × c_p × temperature difference) and the other loads to the air once known.',refs:[],fields:['cQat','cQot']});
+  if(ph) add({id:'coilFluid',sev:'info',title:'Secondary fluid properties are placeholders',val:'ρ, c_p, μ, k not from a datasheet',lim:'—',
     msg:'The fluid properties are round placeholder numbers. Viscosity at the operating temperature decides the tube-side regime and with it the fluid temperature the coil needs.',
     fix:'Enter density, specific heat, viscosity and conductivity from the supplier datasheet at the fluid inlet temperature.',refs:[],fields:['cRho','cCp','cMu','cKfl']});
   return out;

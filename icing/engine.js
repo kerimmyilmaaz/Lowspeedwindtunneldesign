@@ -230,7 +230,7 @@ function thermal(R,G,LWC,h){
   const m_su=LWC*1e-3*R.Q;
   o.m_su=m_su;
   o.sprey=m_su*(4183*(G.sp.Tw-0)+334e3+2050*(0-T));
-  o.ek=G.coil?G.coil.Q_at+G.coil.Q_oth:0;                     /* atomising air + other loads entered in the coil designer */
+  o.ek=G.coil?(LWC>0?G.coil.Q_at:0)+G.coil.Q_oth:0;                     /* atomising air + other loads entered in the coil designer */
   o.top=o.fan+o.motor+o.duvar+o.sprey+o.ek; o.sec=o.top*G.tmarg;
   return o;
 }
@@ -391,7 +391,7 @@ function deney(G,s,LWC,f,kose,Qk,C,UA,fm){
   const O=G.ops, Th=s.Tc, Rk=circuit(Object.assign({},G,{buz1:kose}),s.V,s.yer,s.h);
   const K0=s.R.K_top, Kc=Rk.K_top, Khx=Rk.hx.Kref*G.leak, sd=Rk.geo.s_dn, A_y=2*(sd/O.hatve)*sd*O.L_buz;
   const md=LWC*1e-3*s.V*Rk.A_TS, db=2*f*md/(O.rho_buz*A_y)/(O.hatve-O.t_kanat);
-  const qQ=Rk.q_TS*Rk.Q, Qsp=md*(4183*G.sp.Tw+334e3+2050*(0-Th)), Qx=G.coil?G.coil.Q_at+G.coil.Q_oth:0, dt=10;
+  const qQ=Rk.q_TS*Rk.Q, Qsp=md*(4183*G.sp.Tw+334e3+2050*(0-Th)), Qx=G.coil?(LWC>0?G.coil.Q_at:0)+G.coil.Q_oth:0, dt=10;
   let t=0, T=Th, Et=O.E_tampon, why='', b=0, lam=1;
   const ts=[], lams=[], Ts=[];
   for(;;){

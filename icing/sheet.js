@@ -317,7 +317,7 @@ async function exportSheet(ST,O,prog){
   if(O.inc.coil!==false&&ST.COSPEC){
     prog(0.75,'Coil specification…');
     head('Coil specification for manufacturers','04b');
-    para('Two-stage plate-fin, round-tube air cooler rated against the heat load of this tunnel. Air side: finned-bundle relation of the VDI Heat Atlas with Schmidt fin efficiency; tube side: Gnielinski (turbulent) or Hausen (laminar); counter-flow effectiveness. Values marked as estimates come from this preliminary rating and are replaced by the manufacturer\'s own. The leading-edge ice model is calibrated on NASA TM-100116 and is preliminary.',7);
+    para('Two-stage plate-fin, round-tube air cooler rated against the heat load of this tunnel. Air side: finned-bundle relation of the VDI Heat Atlas with Schmidt fin efficiency; tube side: Gnielinski (turbulent) or Hausen (laminar); counter-flow effectiveness. Values marked as estimates come from this preliminary rating and are replaced by the manufacturer\'s own. The leading-edge ice model is the project\'s own: its constants were fitted to one observation in NASA TM-100116 on a different coil, so run times are preliminary.',7);
     ST.COSPEC.forEach(g=>{
       sub(g.h);
       g.rows.forEach(r=>{ font(FM,'normal',6.8,C.ink); const ls=doc.splitTextToSize(tx(r[1]),W-2*M-50), hh=ls.length*3.1+1.9; need(hh+1);

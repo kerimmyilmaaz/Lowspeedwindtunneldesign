@@ -27,15 +27,15 @@ function mount(host,onState){
   const L=(c,o)=>new T.MeshLambertMaterial(Object.assign({color:c},o||{}));
   const MAT={cu:L(0xC77A2E),fin:L(0xB9C4CA,{clippingPlanes:[clip],side:T.DoubleSide}),steel:L(0x7C8B95,{clippingPlanes:[clip]}),
     sheet:L(0x8FA3AE,{transparent:true,opacity:0.22,side:T.DoubleSide,depthWrite:false,clippingPlanes:[clip]}),pan:L(0x56677A),
-    cold:L(0x2FA8D5),ret:L(0x8FD9F2),ice:L(0xF3FDFF,{emissive:0x35505c}),flow:L(0x4FD8C2)};
+    cold:L(0x2FA8D5),mid:L(0x5FC0E4),ret:L(0x8FD9F2),ice:L(0xF3FDFF,{emissive:0x35505c}),flow:L(0x4FD8C2)};
   const root=new T.Group(), gCore=new T.Group(), gFins=new T.Group(), gCase=new T.Group(), gIce=new T.Group(), gFlow=new T.Group(); root.add(gCore,gFins,gCase,gIce,gFlow); scene.add(root);
   const m4=new T.Matrix4(), q=new T.Quaternion(), v3=new T.Vector3(), one=new T.Vector3(1,1,1), ex=new T.Euler();
-  let M=null, R=3, az=VIEWS.iso[0], el=VIEWS.iso[1], taz=az, tel=el, dist=1, tdist=1, auto=!RM.matches, dirty=true, vis=true, raf=0, st={casing:true,cut:false,ice:0,fins:true};
-  const clear=g=>{ while(g.children.length){ const o=g.children.pop(); if(o.geometry) o.geometry.dispose(); } };
+  let M=null, R=3, az=VIEWS.iso[0], el=VIEWS.iso[1], taz=az, tel=el, dist=1, tdist=1, auto=!RM.matches, dirty=true, settle=0, vis=true, raf=0, st={casing:true,cut:false,ice:0,fins:true};
+  const clear=g=>{ while(g.children.length){ const o=g.children.pop(); o.traverse(x=>{ if(x.geometry) x.geometry.dispose(); if(x.isInstancedMesh) x.dispose(); if(x.material&&x.userData.own) x.material.dispose(); }); } };
   const inst=(geo,mat,n)=>{ const im=new T.InstancedMesh(geo,mat,n); im.frustumCulled=false; return im; };
 
-  function rowsOf(M){ const out=[]; let z=-M.depth/2; M.stages.forEach((s,si)=>{ for(let r=0;r<s.rows;r++) out.push({si,r,z:z+(r+0.5)*M.Pl,off:M.stag&&(out.length%2)?M.Pt/2:0}); z+=s.rows*M.Pl+(si<M.stages.length-1?M.gap:0); }); return out; }
-  function tubeYs(M,row){ const ys=[], n=M.Nt-(row.off?1:0); for(let j=0;j<n;j++) ys.push(-M.H/2+(M.H-(M.Nt-1)*M.Pt)/2+j*M.Pt+row.off); return ys; }
+  function rowsOf(M){ const out=[]; let z=-M.depth/2; M.stages.forEach((s,si)=>{ for(let r=0;r<s.rows;r++) out.push({si,r,z:z+(r+0.5)*M.Pl,off:M.stag?(out.length%2?1:-1)*M.Pt/4:0}); z+=s.rows*M.Pl+(si<M.stages.length-1?M.gap:0); }); return out; }
+  function tubeYs(M,row){ const ys=[], n=M.Nt; for(let j=0;j<n;j++) ys.push(-M.H/2+(M.H-(M.Nt-1)*M.Pt)/2+j*M.Pt+row.off); return ys; }
   function build(){
     clear(gCore); clear(gFins); clear(gCase); clear(gFlow);
     const W=M.W, H=M.H, r=M.Do/2, xt=W/2+0.035, rows=rowsOf(M); M._rows=rows;
@@ -47,11 +47,16 @@ function mount(host,onState){
     const bends=[], zs=si=>rows.filter(x=>x.si===si);
     M.stages.forEach((s,si)=>{ const rs=zs(si), n=rs.length;
       for(let j=0;j<n-1;j++){ const a=rs[n-1-j], b=rs[n-2-j], side=j%2===0?-1:1; tubeYs(M,a).forEach((y,i)=>{ const yb=tubeYs(M,b)[Math.min(i,tubeYs(M,b).length-1)]; bends.push([side*xt,y,a.z,yb,b.z]); }); }
-      const hd=(row,mat,side,up)=>{ const hg=new T.CylinderGeometry(0.028,0.028,H+0.06,14), h=new T.Mesh(hg,mat); h.position.set(side*(xt+0.045),0,row.z); gCore.add(h);
+      const hd=(row,mat,side,up,noz)=>{ const hg=new T.CylinderGeometry(0.028,0.028,H+0.06,14), h=new T.Mesh(hg,mat); h.position.set(side*(xt+0.045),0,row.z); gCore.add(h);
         const sg=new T.CylinderGeometry(r*0.8,r*0.8,0.05,6); sg.rotateZ(Math.PI/2); const ys=tubeYs(M,row), stubs=inst(sg,mat,ys.length); ys.forEach((y,i)=>{ m4.makeTranslation(side*(xt+0.02),y,row.z); stubs.setMatrixAt(i,m4); }); gCore.add(stubs);
-        const ng=new T.CylinderGeometry(0.028,0.028,0.2,14); ng.rotateZ(Math.PI/2); const nz=new T.Mesh(ng,mat); nz.position.set(side*(xt+0.15),(up?1:-1)*(H/2-0.06),row.z); gCore.add(nz);
+        if(noz===false) return; const ng=new T.CylinderGeometry(0.028,0.028,0.2,14); ng.rotateZ(Math.PI/2); const nz=new T.Mesh(ng,mat); nz.position.set(side*(xt+0.15),(up?1:-1)*(H/2-0.06),row.z); gCore.add(nz);
         const fg=new T.CylinderGeometry(0.052,0.052,0.014,18); fg.rotateZ(Math.PI/2); const fl=new T.Mesh(fg,mat); fl.position.set(side*(xt+0.255),nz.position.y,row.z); gCore.add(fl); };
-      hd(rs[n-1],MAT.cold,1,false); hd(rs[0],MAT.ret,n%2===0?1:-1,true); });
+      const last=si===M.stages.length-1, first=si===0, so=n%2===0?1:-1;
+      hd(rs[n-1],last?MAT.cold:MAT.mid,1,false,last); hd(rs[0],first?MAT.ret:MAT.mid,so,true,first);
+      if(!first){ /* jumper: this stage's outlet header to the inlet header of the stage in front of it */
+        const prev=zs(si-1), zb=prev[prev.length-1].z, za=rs[0].z, xa=so*(xt+0.045), xb=xt+0.045, yj=H/2+0.03;
+        const p1=new T.Mesh(new T.CylinderGeometry(0.028,0.028,Math.abs(za-zb)+0.056,14),MAT.mid); p1.rotation.x=Math.PI/2; p1.position.set(xa,yj,(za+zb)/2); gCore.add(p1);
+        if(xa!==xb){ const p2=new T.Mesh(new T.CylinderGeometry(0.028,0.028,Math.abs(xa-xb)+0.056,14),MAT.mid); p2.rotation.z=Math.PI/2; p2.position.set((xa+xb)/2,yj,zb); gCore.add(p2); } } });
     if(bends.length){ const dref=M.stag?Math.hypot(M.Pt/2,M.Pl):M.Pl, ug=new T.TorusGeometry(0.5,r/dref,6,12,Math.PI); const ub=inst(ug,MAT.cu,bends.length);
       bends.forEach((b,i)=>{ const dy=b[3]-b[1], dz=b[4]-b[2], d=Math.hypot(dy,dz), side=Math.sign(b[0]);
         /* torus arc lies in its local xy-plane, ends on the local x-axis: map local x → tube-to-tube direction, local y → ±x (outwards) */
@@ -74,8 +79,8 @@ function mount(host,onState){
     [[W+0.14,0.01,0,zc0-0.03],[W+0.14,0.01,0,zc1+0.03],[0.01,Lc+0.06,-(W/2+0.07),0],[0.01,Lc+0.06,W/2+0.07,0]].forEach(a=>{ const b=new T.Mesh(new T.BoxGeometry(a[0],0.05,a[1]),MAT.pan); b.position.set(a[2],-H/2-0.09,a[3]); gCore.add(b); });
     const dr=new T.Mesh(new T.CylinderGeometry(0.018,0.018,0.3,10),MAT.pan); dr.position.set(W/2-0.06,-H/2-0.27,zc1-0.03); gCore.add(dr);
     /* airflow arrows */
-    [[-0.28,0.22],[0.28,-0.22]].forEach(a=>{ const ar=new T.ArrowHelper(new T.Vector3(0,0,1),new T.Vector3(a[0]*W,a[1]*H,zc0-0.42*W-0.1),0.36*W,0x4FD8C2,0.1*W,0.055*W); gFlow.add(ar); });
-    R=0.5*Math.hypot(W+0.6,H+0.4,M.depth+0.5); ice(); frame(); dirty=true;
+    [[-0.28,0.22],[0.28,-0.22]].forEach(a=>{ const ar=new T.ArrowHelper(new T.Vector3(0,0,1),new T.Vector3(a[0]*W,a[1]*H,zc0-0.42*W-0.1),0.36*W,0x4FD8C2,0.1*W,0.055*W); ar.line.userData.own=ar.cone.userData.own=true; gFlow.add(ar); });
+    R=0.5*Math.hypot(W+0.6,H+0.4,M.depth+0.5); ice(); frame(); dirty=true; settle=40;
   }
   /* ice: horns on the leading edges of the first stage and caps on the first tube row; st.ice = horn width [m] */
   function ice(){
@@ -95,6 +100,7 @@ function mount(host,onState){
   function tick(){
     raf=requestAnimationFrame(tick); if(!vis||!M) return;
     if(auto){ taz+=0.0016; dirty=true; }
+    if(settle>0){ settle--; dirty=true; }   /* redraw for a few frames after a rebuild, so a dropped frame cannot leave the view empty */
     const k=0.14, da=taz-az, de=tel-el, dd=tdist-dist;
     if(Math.abs(da)+Math.abs(de)+Math.abs(dd)/Math.max(dist,1e-3)>1e-4){ az+=da*k; el+=de*k; dist+=dd*k; dirty=true; }
     if(!dirty) return; dirty=false;
@@ -107,8 +113,9 @@ function mount(host,onState){
   cv.addEventListener('pointermove',e=>{ if(!drag) return; taz=drag.az-(e.clientX-drag.x)*0.008; if(!drag.touch) tel=Math.max(-0.5,Math.min(1.52,drag.el+(e.clientY-drag.y)*0.006)); });
   const end=()=>{ drag=null; cv.style.cursor='grab'; }; cv.addEventListener('pointerup',end); cv.addEventListener('pointercancel',end);
   cv.addEventListener('wheel',e=>{ if(!e.ctrlKey&&!e.metaKey) return; e.preventDefault(); tdist=Math.max(R*0.5,Math.min(R*8,tdist*Math.exp(e.deltaY*0.0015))); auto=false; },{passive:false});
+  cv.addEventListener('webglcontextlost',e=>e.preventDefault()); cv.addEventListener('webglcontextrestored',()=>{ settle=40; });
   const ro=new ResizeObserver(size); ro.observe(host);
-  const io=new IntersectionObserver(es=>{ vis=es[0].isIntersecting; dirty=true; }); io.observe(host);
+  const io=new IntersectionObserver(es=>{ vis=es[0].isIntersecting; dirty=true; settle=10; }); io.observe(host);
   size(); tick();
   return {
     update(model){ const key=JSON.stringify(model); if(M&&M.key===key) return; M=Object.assign({},model,{key}); build(); apply(); },
@@ -117,6 +124,7 @@ function mount(host,onState){
     set(k,v){ st[k]=v; if(k==='ice') ice(); else apply(); },
     get(k){ return st[k]; },
     drawn(){ return M?M.drawn:[]; },
+    state(){ return {vis,dist,tdist,az,el,R,settle,calls:renderer.info.render.calls,tris:renderer.info.render.triangles,kids:[gCore,gFins,gCase,gIce,gFlow].map(g=>g.children.length),cam:cam.position.toArray(),clip:clip.constant}; },
     dispose(){ cancelAnimationFrame(raf); ro.disconnect(); io.disconnect(); renderer.dispose(); cv.remove(); }
   };
 }
