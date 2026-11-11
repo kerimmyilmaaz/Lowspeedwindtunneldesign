@@ -38,7 +38,8 @@ const GROUPS=[
  {g:'noz',name:'Contraction',color:KC('noz'),ref:'G.L_daralma'},
  {g:'th', name:'Thermal budget · margins',color:KC('duct'),ref:'G.yal · G.sizinti'},
  {g:'ice',name:'Icing scenarios · fan margin',color:KC('model'),ref:'G.buz'},
- {g:'ops',name:'Operating cycle',color:KC('spray'),ref:'G.isil · G.coz'}
+ {g:'ops',name:'Operating cycle',color:KC('spray'),ref:'G.isil · G.coz'},
+ {g:'coil',name:'Coil designer · tubes, fins, fluid',color:KC('hx'),ref:'web: coil rating'}
 ];
 const F=(k,g,label,unit,def,m,o)=>Object.assign({k,g,label,unit,def,m},o||{});
 const FIELDS=[
@@ -132,7 +133,33 @@ const FIELDS=[
  F('bmax','ops','Allowed coil blockage b_max','–',0.70,'G.hx.b_max'),
  F('Pis','ops','De-icing air heater (A)','kW',20,'G.coz.P_isit'),
  F('Pdef','ops','Coil defrost power (B)','kW',10,'G.coz.P_def'),
- F('tday','ops','Working day','h',8,'G.isil.t_gun')
+ F('tday','ops','Working day','h',8,'G.isil.t_gun'),
+ F('cDo','coil','Tube outer diameter','mm',15.9,'coil'),
+ F('cTw','coil','Tube wall thickness','mm',1.0,'coil'),
+ F('cPt','coil','Tube pitch across the flow','mm',50,'coil'),
+ F('cPl','coil','Row pitch along the flow','mm',50,'coil'),
+ F('cArr','coil','Tube arrangement','',"inline",'coil',{kind:'seg',opts:[['inline','In-line'],['stag','Staggered']]}),
+ F('cN1','coil','Front stage rows','pcs',2,'coil',{int:true,zero:true}),
+ F('cFp1','coil','Front stage fin pitch','mm',12,'coil'),
+ F('cN2','coil','Main stage rows','pcs',6,'coil',{int:true}),
+ F('cFp2','coil','Main stage fin pitch','mm',8,'coil'),
+ F('cGap','coil','Gap between the stages','cm',10,'coil',{zero:true}),
+ F('cTf','coil','Fin thickness','mm',0.3,'coil'),
+ F('cKf','coil','Fin conductivity (Al ≈ 200)','W/mK',200,'coil'),
+ F('cKt','coil','Tube conductivity (Cu ≈ 390)','W/mK',390,'coil'),
+ F('cNc','coil','Parallel circuits (0 = one per tube position)','pcs',0,'coil',{int:true,zero:true}),
+ F('cdTf','coil','Fluid temperature rise','K',3,'coil'),
+ F('cRho','coil','Fluid density','kg/m³',1300,'datasheet'),
+ F('cCp','coil','Fluid specific heat','J/kgK',2700,'datasheet'),
+ F('cMu','coil','Fluid viscosity at inlet temperature','mPa·s',15,'datasheet'),
+ F('cKfl','coil','Fluid conductivity','W/mK',0.45,'datasheet'),
+ F('cQat','coil','Atomising-air heat load','kW',0,'nozzle data',{zero:true}),
+ F('cQot','coil','Other loads (pump, thermal bridges)','kW',0,'estimate',{zero:true}),
+ F('cRi','coil','Ice density on the coil','kg/m³',400,'[MS] 250–550'),
+ F('cKi','coil','Ice layer conductivity','W/mK',0.3,'estimate'),
+ F('cCr','coil','Horn shape × density c·ρ','kg/m³',540,'[NA2] fit'),
+ F('cNe','coil','Leading-edge exponent n_e','–',1.25,'[NA2] fit 1.1–1.4'),
+ F('cBd','coil','Defrost trigger blockage','–',0.6,'coil')
 ];
 const FK={}; FIELDS.forEach(f=>FK[f.k]=f);
 const EXTRA={fcQ:'',fcdp:'',fcrho:1.204,fcname:''};
@@ -167,6 +194,12 @@ function validate(p){
   if(p.th1>=45||p.th3>=45) e.push('Diffuser angles must be below 45°.');
   if(p.gad2th>=170) e.push('WAD angle must be below 170°.');
   if(p.leak<1) e.push('Leakage factor cannot be below 1.');
+  if(p.cTw*2>=p.cDo) e.push('Tube wall is too thick for the tube diameter.');
+  if(p.cPt<=p.cDo||p.cPl<=p.cDo*(p.cArr==='stag'?0.6:1)) e.push('Tube pitches must exceed the tube diameter.');
+  if(p.cArr==='stag'&&Math.sqrt(p.cPt*p.cPt/4+p.cPl*p.cPl)<=p.cDo) e.push('Staggered tubes touch: increase a tube pitch.');
+  if(p.cTf>=Math.min(p.cFp1,p.cFp2)) e.push('Fin thickness must be smaller than the fin pitch.');
+  if(p.cBd>=0.98) e.push('Defrost trigger blockage must be below 0.98.');
+  if(p.cN1+p.cN2>40) e.push('At most 40 tube rows.');
   return e;
 }
 
@@ -219,7 +252,11 @@ function buildG(p){
     ops:{t_ic:p.tic*mm,rho_ic:2700,c_ic:900,rho_yal:40,c_yal:1400,f_yal:0.5,m_hx:p.mhx,c_hx:480,V_sivi:0.05,rho_sivi:800,c_sivi:2000,m_ic:p.mic,c_icd:600,
       Q_sec:p.Qk*1e3,Q_kap:[p.Qk*1e3*2/3,p.Qk*1e3,p.Qk*1e3*4/3],dTy:p.dTy,E_tampon:0,V_sog:15,tol:0.5,dT_izin:p.dTa,w0:0.0073,t_max:120,t_gun:p.tday,
       LWC:[0.25,0.5,1,2],hatve:p.pitch*mm,t_kanat:0.2e-3,L_buz:0.05,rho_buz:600,f_su:[p.fsu,1.0],n_tik:2.5,b_max:p.bmax,
-      coz:{T_son:5,P_isit:p.Pis*1e3,V_fan:15,P_def:p.Pdef*1e3,eta_def:0.6,n_drain:2,d_drain:0.025,h_drain:0.10,t_suz:10,t_hazir:15}}};
+      coz:{T_son:5,P_isit:p.Pis*1e3,V_fan:15,P_def:p.Pdef*1e3,eta_def:0.6,n_drain:2,d_drain:0.025,h_drain:0.10,t_suz:10,t_hazir:15}},
+    /* coil designer (coil.js); densities for the metal mass: copper tubes, aluminium fins; U-bend K is an estimate */
+    coil:{Do:p.cDo*mm,tw:p.cTw*mm,Pt:p.cPt*mm,Pl:p.cPl*mm,arr:p.cArr,N1:p.cN1,fp1:p.cFp1*mm,N2:p.cN2,fp2:p.cFp2*mm,gap:p.cGap*cm,tf:p.cTf*mm,
+      k_fin:p.cKf,k_tube:p.cKt,rho_fin:2700,rho_tube:8960,Ncirc:p.cNc,dTf:p.cdTf,f_rho:p.cRho,f_cp:p.cCp,f_mu:p.cMu*1e-3,f_k:p.cKfl,K_bend:0.5,
+      Q_at:p.cQat*1e3,Q_oth:p.cQot*1e3,f_w:p.fsu,rho_ice:p.cRi,k_ice:p.cKi,crho:p.cCr,n_e:p.cNe,b_def:p.cBd}};
 }
 function parseList(s){ return String(s||'').split(/[\s;,]+/).map(x=>x.trim()).filter(Boolean).map(Number).filter(isFinite); }
 function curve(){
@@ -235,11 +272,12 @@ function compute(){
   const h=E.air(P.T,P.p), G=buildG(P);
   const R=E.circuit(G,P.V,P.yer,h), SN=E.scenarios(G,P.V,P.yer,h,R), Rs=SN[0].R;
   const TB=E.thermal(R,G,P.LWC,h), TBs=E.thermal(Rs,G,P.LWCs,h);
-  const IC=E.icing(R,G,h), AU=E.audit(R,G,h,IC), GT=E.geometryTable(R), FC=E.fanPoint(R,G,curve());
+  const IC=E.icing(R,G,h), GT=E.geometryTable(R), FC=E.fanPoint(R,G,curve());
+  const CO=E.coil(G,SN[SN.length-1],P.LWC), AU=E.audit(R,G,h,IC).concat(E.coilAudit(CO,G,P));
   const Ralt=E.circuit(G,P.V,P.yer==='ayri'?'birlikte':'ayri',h);
   const Vmax=Math.max(55,Math.ceil(P.V*1.1/5)*5), SW=E.sweep(G,P.yer,h,Vmax);
   const ICE=SN.map(s=>E.iced(G,s)), FR=E.fanReq(G,SN), OPS=E.ops(G,SN);
-  return {h,G,R,TB,Rs,TBs,IC,AU,GT,FC,Ralt,SW,SN,ICE,FR,OPS,id:designId()};
+  return {h,G,R,TB,Rs,TBs,IC,AU,GT,FC,Ralt,SW,SN,ICE,FR,OPS,CO,id:designId()};
 }
 
 /* ================= path geometry (plan view, metres) =================
@@ -809,13 +847,17 @@ const SOLVE={
  mvd:[{k:'MVD',to:15,step:1}],
  drop:[{k:'xsp',to:0,step:1},{k:'spT',to:0,step:1}],
  spb:[{k:'spd',to:5,step:1},{k:'spN',to:1,step:1}],
- cond:[{k:'it',to:p=>p.it*6,step:5}]
+ cond:[{k:'it',to:p=>p.it*6,step:5}],
+ coilT:[{k:'cN2',to:16,step:1},{k:'cFp2',to:4,step:0.5},{k:'dTy',to:25,step:0.5}],
+ coilRe:[{k:'cdTf',to:1,step:0.5}],
+ coilFin:[{k:'cTf',to:1,step:0.05}],
+ coilIce:[{k:'cFp1',to:25,step:0.5}]
 };
 const RANK={ok:0,info:1,warn:2,bad:3};
 function auditOf(q){
   if(validate(q).length) return null;
   const h=E.air(q.T,q.p), G=buildG(q), R=E.circuit(G,q.V,q.yer,h);
-  return E.audit(R,G,h,E.icing(R,G,h));
+  return E.audit(R,G,h,E.icing(R,G,h)).concat(E.coilAudit(E.coil(G,{V:q.V,Tc:q.T,h,R},q.LWC),G,q));
 }
 let BLOCK=null;
 function fixPasses(id,patch,base){
@@ -1102,6 +1144,165 @@ function renderThermal(){
   $('#icond').innerHTML='<h3>Duct skin vs lab dew point<small>'+nf(P.RH,0)+'% RH at '+nf(P.Tlab,0)+' °C</small></h3><div class="ic-kv">'+kv('Outer skin',nf(IC.Tskin,1),'°C')+kv('Dew point',nf(IC.Tdew,1),'°C')+kv('Heat flux',nf(IC.qwall,1),'W/m²')+kv('Verdict','<span style="color:var(--'+(cond?'warn':'ok')+')">'+(cond?'condensation':'dry')+'</span>','')+'</div>';
 }
 
+/* ================= render: coil designer ================= */
+const CLS=[['Front stage (takes the ice)',[['cN1',0,6,1],['cFp1',4,20,0.5]]],['Main stage (does the cooling)',[['cN2',1,16,1],['cFp2',3,14,0.5]]],
+  ['Tubes',[['cDo',9.5,25.4,0.1],['cPt',25,80,1],['cPl',20,80,1]]],['Fins and fluid',[['cTf',0.15,0.6,0.05],['cNc',0,60,1],['cdTf',1,8,0.5],['cMu',0.5,60,0.5]]]];
+const CLN={cN1:'Rows',cFp1:'Fin pitch',cN2:'Rows',cFp2:'Fin pitch',cDo:'Outer diameter',cPt:'Pitch across the flow',cPl:'Row pitch along the flow',cTf:'Fin thickness',cNc:'Parallel circuits',cdTf:'Fluid temperature rise',cMu:'Fluid viscosity'};
+let CV=null, cvTry=false, clFrac=0, clBuilt=false;
+function buildCoilCtl(){
+  if(clBuilt) return; clBuilt=true;
+  const host=$('#iclCtl'); let h='';
+  CLS.forEach((g,gi)=>{ h+='<h3>'+g[0]+'</h3>'; g[1].forEach(r=>{ const f=FK[r[0]]; h+='<div class="cl-s"><label for="cl-'+r[0]+'">'+CLN[r[0]]+'</label><output id="clo-'+r[0]+'"></output><input type="range" id="cl-'+r[0]+'" data-k="'+r[0]+'" min="'+r[1]+'" max="'+r[2]+'" step="'+r[3]+'" aria-label="'+esc(f.label)+'"></div>'; });
+    if(gi===2) h+='<div class="iseg" role="group" aria-label="Tube arrangement">'+FK.cArr.opts.map(o=>'<button type="button" data-arr="'+o[0]+'">'+o[1]+'</button>').join('')+'</div>'; });
+  h+='<p class="cl-more">Tube wall, materials, fluid properties, extra loads and the ice model are in <button type="button" data-field="cDo">Geometry → Coil designer</button>.</p>';
+  host.innerHTML=h;
+  host.addEventListener('input',e=>{ const k=e.target.dataset.k; if(!k) return; let v=Number(e.target.value); if(FK[k].int) v=Math.round(v); P[k]=v; syncInputs(); schedule(true); });
+  host.addEventListener('click',e=>{ const b=e.target.closest('[data-arr]'); if(b){ P.cArr=b.dataset.arr; syncInputs(); schedule(true); return; } const g=e.target.closest('[data-field]'); if(g) goField(g.dataset.field); });
+  const stage=$('#iclStage');
+  stage.addEventListener('click',e=>{ const v=e.target.closest('[data-v]'), t=e.target.closest('[data-t]'), z=e.target.closest('[data-z]');
+    if(v){ $$('.cl-views button',stage).forEach(b=>b.setAttribute('aria-pressed',String(b===v))); if(CV) CV.view(v.dataset.v); }
+    else if(t){ const on=t.getAttribute('aria-pressed')!=='true'; t.setAttribute('aria-pressed',String(on)); if(CV) CV.set(t.dataset.t,on); }
+    else if(z&&CV) CV.zoom(Number(z.dataset.z)); });
+  $('#iclIce').addEventListener('input',e=>{ clFrac=Number(e.target.value)/1000; coilIce(); });
+  $('#iclCopy').addEventListener('click',()=>{ const txt=coilSpec().map(g=>'\n'+g.h.toUpperCase()+'\n'+g.rows.map(r=>r[0]+':\t'+r[1]).join('\n')).join('\n').trim(); copyText('Coil specification · '+S.id+' · '+shareURL()+'\n\n'+txt,$('#iclCopied')); });
+  if('IntersectionObserver' in window){ const io=new IntersectionObserver(es=>{ if(es.some(x=>x.isIntersecting)){ io.disconnect(); startCoilView(); } },{rootMargin:'400px 0px'}); io.observe(stage); } else startCoilView();
+}
+function startCoilView(){
+  if(cvTry||!window.CoilView) return; cvTry=true;
+  const wait=$('#iclWait'); wait.textContent='Loading the 3D view…';
+  CoilView.load().then(()=>{ CV=CoilView.mount($('#iclCv')); if(!CV) throw new Error('WebGL not available'); wait.remove(); if(S){ coilModel(); coilIce(); } })
+    .catch(()=>{ wait.textContent='The 3D view could not start in this browser. The section drawing below shows the same geometry.'; });
+}
+function coilModel(){
+  if(!CV) return; const g=S.CO.g, c=S.G.coil;
+  CV.update({W:g.W,H:g.H,Do:c.Do,Pt:c.Pt,Pl:c.Pl,stag:g.stag,Nt:g.Nt,tf:c.tf,gap:g.stages.length>1?c.gap:0,depth:g.depth,stages:g.stages.map(s=>({rows:s.rows,fp:s.fp}))});
+}
+function coilTime(){ const C=S.CO, tmax=isFinite(C.t_end)?C.t_end:3600; return clFrac*tmax; }
+function coilIce(){
+  if(!S) return; const C=S.CO, c=S.G.coil, t=coilTime(), w=C.wAt(t), b=C.bAt(t), fp=C.g.stages[0].fp;
+  $('#iclIceOut').innerHTML='<b>'+nf(t/60,0)+' min</b> at '+nf(C.LWC,1)+' g/m³ · horn '+nf(w*1000,1)+' mm · open gap '+nf(Math.max(0,fp-w)*1000,1)+' of '+nf((fp-c.tf)*1000,1)+' mm · blockage '+nf(b,2)+' · λ '+(b<0.995?nf(C.lamAt(t),2):'—')+(clFrac>=0.999?' · defrost now':'');
+  if(CV) CV.set('ice',clFrac>0?w:0);
+  coilDrawing();
+}
+/* true-to-scale section drawing: left, a slice along the flow (tubes); right, a slice across the fins seen from above */
+function coilDrawing(){
+  const C=S.CO, g=C.g, c=S.G.coil, mm=1000, f=n=>n.toFixed(1), t=coilTime(), w=clFrac>0?C.wAt(t):c.tf;
+  const depth=g.depth*mm, Pt=c.Pt*mm, Pl=c.Pl*mm, Do=c.Do*mm, Di=g.Di*mm, hgt=3*Pt, W1=400, k=Math.min((W1-80)/depth,170/hgt), x0=56, y0=46;
+  let o='<text class="dl" x="'+x0+'" y="16">Section along the flow</text>';
+  const X=z=>x0+z*k, Y=y=>y0+y*k;
+  let z=0; const rowsX=[];
+  g.stages.forEach((s,si)=>{ const d=s.rows*Pl; o+='<rect class="finp" x="'+f(X(z))+'" y="'+f(Y(0))+'" width="'+f(d*k)+'" height="'+f(hgt*k)+'"/>';
+    for(let r=0;r<s.rows;r++){ const zc=z+(r+0.5)*Pl, off=g.stag&&(rowsX.length%2)?Pt/2:0; rowsX.push(zc);
+      for(let j=-1;j<4;j++){ const yc=(j+0.5)*Pt+off; if(yc<Do/2||yc>hgt-Do/2) continue; o+='<circle class="tube" cx="'+f(X(zc))+'" cy="'+f(Y(yc))+'" r="'+f(Do/2*k)+'"/><circle class="bore" cx="'+f(X(zc))+'" cy="'+f(Y(yc))+'" r="'+f(Di/2*k)+'"/>'; } }
+    o+='<text class="dt" x="'+f(X(z+d/2))+'" y="'+f(Y(hgt)+15)+'" text-anchor="middle">'+s.rows+' row'+(s.rows>1?'s':'')+'</text><text class="dt" x="'+f(X(z+d/2))+'" y="'+f(Y(hgt)+28)+'" text-anchor="middle" style="fill:var(--muted)">fins '+nf(s.fp*mm,1)+'</text>';
+    z+=d+(si<g.stages.length-1?c.gap*mm:0); });
+  const dimH=(xa,xb,y,lab)=>'<path class="dim" d="M'+f(xa)+','+f(y-4)+'V'+f(y+4)+'M'+f(xb)+','+f(y-4)+'V'+f(y+4)+'M'+f(xa)+','+f(y)+'H'+f(xb)+'"/><text class="dt" x="'+f((xa+xb)/2)+'" y="'+f(y-6)+'" text-anchor="middle">'+lab+'</text>';
+  const dimV=(x,ya,yb,lab)=>'<path class="dim" d="M'+f(x-4)+','+f(ya)+'H'+f(x+4)+'M'+f(x-4)+','+f(yb)+'H'+f(x+4)+'M'+f(x)+','+f(ya)+'V'+f(yb)+'"/><text class="dt" x="'+f(x-7)+'" y="'+f((ya+yb)/2+4)+'" text-anchor="end">'+lab+'</text>';
+  o+=dimH(X(0),X(depth),y0-12,'depth '+nf(depth,0)+' mm');
+  o+=dimV(x0-12,Y(0.5*Pt),Y(1.5*Pt),nf(Pt,0));
+  const rp=g.stages.findIndex(s=>s.rows>1), r0=rp<0?-1:g.stages.slice(0,rp).reduce((a,s)=>a+s.rows,0);
+  if(r0>=0) o+=dimH(X(rowsX[r0]),X(rowsX[r0+1]),Y(hgt)+54,'row pitch '+nf(Pl,0)+' mm');
+  o+='<text class="dt" x="'+x0+'" y="'+f(Y(hgt)+74)+'">tube Ø'+nf(Do,1)+' × '+nf(c.tw*mm,1)+' mm · pitch across '+nf(Pt,0)+' mm</text>';
+  o+='<path class="air" d="M8,'+f(Y(hgt/2))+'H'+f(x0-22)+'m-6,-4l6,4l-6,4"/>';
+  /* right: fins from above, 5 gaps of each stage */
+  const xr=W1+40, WR=330, s0=g.stages[0], s1=g.stages[g.stages.length-1], span=Math.max(s0.fp,s1.fp)*mm*5.4, kr=Math.min((WR-20)/span,9), lenPx=58, yT=62;
+  o+='<text class="dl" x="'+xr+'" y="16">Fins seen from above · air enters from the top</text>';
+  const strip=(s,yy,label,iced)=>{ const fp=s.fp*mm, n=Math.floor(span/fp)+1; let h='';
+    for(let i=0;i<n;i++){ const x=xr+10+i*fp*kr; h+='<line class="finl" x1="'+f(x)+'" x2="'+f(x)+'" y1="'+yy+'" y2="'+(yy+lenPx)+'" stroke-width="'+f(Math.max(1,c.tf*mm*kr))+'"/>';
+      if(iced&&w>c.tf*1.02){ const ww=Math.min(w*mm,fp*0.999)*kr, dd=Math.min(ww*1.1,26); h+='<path class="icep" d="M'+f(x-ww/2)+','+(yy+2)+'q0,'+f(-dd)+' '+f(ww/2)+','+f(-dd)+'q'+f(ww/2)+',0 '+f(ww/2)+','+f(dd)+'z"/>'; } }
+    if(n>1) h+=dimH(xr+10,xr+10+fp*kr,yy+lenPx+16,nf(fp,1)+' mm');
+    return h+'<text class="dt" x="'+f(xr+10+fp*kr+14)+'" y="'+(yy+lenPx+20)+'" style="fill:var(--muted)">'+label+'</text>'; };
+  o+=strip(s0,yT,(g.stages.length>1?'front stage':'coil')+(clFrac>0?' · open '+nf(Math.max(0,s0.fp-w)*mm,1)+' mm':' · gap '+nf((s0.fp-c.tf)*mm,1)+' mm'),true);
+  if(g.stages.length>1) o+=strip(s1,yT+lenPx+64,'main stage · gap '+nf((s1.fp-c.tf)*mm,1)+' mm',false);
+  const Hs=Math.max(Y(hgt)+84,yT+2*lenPx+96);
+  $('#iclSec').innerHTML='<h3>Section drawing, to scale<small>'+(g.stag?'staggered':'in-line')+' · '+g.Nt+' tubes per row · '+nf(g.W*100,0)+' × '+nf(g.H*100,0)+' cm face</small></h3><div class="cl-dr"><svg viewBox="0 0 '+(xr+WR)+' '+f(Hs)+'" role="img" aria-label="Section drawing of the tube pattern and the fin spacing with dimensions">'+o+'</svg></div>';
+}
+function coilSpec(){
+  const C=S.CO, g=C.g, c=S.G.coil, k=C.clean, i=C.iced, R=S.R, mm=1000, est=' (estimate)';
+  return [
+   {h:'Duty',rows:[
+    ['Service','Air cooler of a closed-circuit icing wind tunnel, supercooled spray in the air stream'],
+    ['Air flow',ni(C.mdot/C.air.rho*3600)+' m³/h at the coil · '+nf(C.mdot,2)+' kg/s · '+nf(C.air.rho,3)+' kg/m³'],
+    ['Air leaving the coil',nf(C.T0,1)+' °C (test section '+nf(P.T,1)+' °C static at '+nf(P.V,0)+' m/s)'],
+    ['Air entering the coil',nf(k.Tin,1)+' °C clean circuit · '+nf(i.Tin,1)+' °C iced circuit'],
+    ['Capacity',nf(k.Q/1000,1)+' kW clean circuit · '+nf(i.Q/1000,1)+' kW iced circuit (λ_fan '+nf(P.lamF,1)+'), cloud '+nf(P.LWC,1)+' g/m³'],
+    ['Face (duct inside)',nf(g.W*mm,0)+' × '+nf(g.H*mm,0)+' mm · face velocity '+nf(k.Vf,2)+' m/s'],
+    ['Air-side Δp, clean',nf(C.dp_in,0)+' Pa used in the circuit loss · '+nf(k.dp_air,0)+' Pa geometry cross-check'+est],
+    ['Lowest air temperature',nf(P.T,0)+' °C · laboratory '+nf(P.Tlab,0)+' °C, '+nf(P.RH,0)+'% RH']]},
+   {h:'Secondary fluid',rows:[
+    ['Properties used','ρ '+nf(P.cRho,0)+' kg/m³ · c_p '+nf(P.cCp,0)+' J/kgK · µ '+nf(P.cMu,1)+' mPa·s · k '+nf(P.cKfl,2)+' W/mK (to be replaced by the fluid datasheet)'],
+    ['Inlet temperature needed',nf(k.Tf_in,1)+' °C clean · '+nf(i.Tf_in,1)+' °C iced circuit'+est],
+    ['Temperature rise',nf(P.cdTf,1)+' K'],
+    ['Flow',nf(k.Vdot*3600,1)+' m³/h clean · '+nf(i.Vdot*3600,1)+' m³/h iced circuit'],
+    ['Tube velocity · Reynolds number',nf(i.v,2)+' m/s · '+ni(i.Re)+' ('+i.regime+')'],
+    ['Tube-side Δp',nf(i.dp_f/1000,0)+' kPa at the iced-circuit flow'+est]]},
+   {h:'Geometry proposal',rows:[
+    ['Tubes','Ø'+nf(P.cDo,1)+' × '+nf(P.cTw,1)+' mm, k '+nf(P.cKt,0)+' W/mK · '+g.tubes+' tubes of '+nf(g.W*mm,0)+' mm'],
+    ['Tube pattern',(g.stag?'staggered':'in-line')+' · '+nf(P.cPt,0)+' mm across × '+nf(P.cPl,0)+' mm along the flow · '+g.Nt+' tubes per row'],
+    ['Stages',g.stages.map(s=>s.name.toLowerCase()+' '+s.rows+' rows, fin pitch '+nf(s.fp*mm,1)+' mm ('+s.nfin+' fins)').join(' · ')+(g.stages.length>1?' · '+nf(P.cGap,0)+' cm gap':'')],
+    ['Fins','plain plate fins '+nf(P.cTf,2)+' mm, k '+nf(P.cKf,0)+' W/mK · fin efficiency '+k.st.map(s=>nf(s.eta,2)).join(' / ')],
+    ['Surface',nf(g.A_o,0)+' m² air side · '+nf(g.A_i,1)+' m² tube side'],
+    ['Circuits',g.Ncirc+' in parallel · '+nf(g.passes,1)+' passes each, counter-flow (fluid enters at the rear row)'],
+    ['Depth · internal volume · metal mass',nf(g.depth*mm,0)+' mm · '+nf(g.V_fluid*1000,0)+' L in the tubes · '+nf(g.m_metal,0)+' kg tubes and fins'+est]]},
+   {h:'Icing service and defrost',rows:[
+    ['Spray water',nf(S.IC.water_Lh,1)+' kg/h at '+nf(P.LWC,1)+' g/m³, MVD '+nf(P.MVD,0)+' µm · '+nf(P.fsu*100,0)+'% assumed to reach the coil face'],
+    ['Ice form','rime on fin leading edges and the first tube rows; front-stage fin pitch chosen wide for this reason'],
+    ['Run before defrost',(isFinite(C.t_end)?nf(C.t_end/60,0)+' min':'not reached')+' to front-fin blockage '+nf(P.cBd,2)+' or λ_fan (preliminary model)'],
+    ['Ice on the coil at that point',nf(C.iceMass(isFinite(C.t_end)?C.t_end:3600),1)+' kg'],
+    ['Defrost',nf(P.Pdef,0)+' kW coil defrost planned; drain pan and heated drain line below the coil']]},
+   {h:'Please confirm in the quotation',rows:[
+    ['1','Capacity at the stated air and fluid temperatures, with the fluid you propose'],
+    ['2','Clean air-side Δp at '+nf(k.Vf,2)+' m/s face velocity, and fluid-side Δp'],
+    ['3','Final rows, fin pitches, circuiting, connection sizes and positions'],
+    ['4','Internal volume, dry mass, materials and lowest design temperature'],
+    ['5','Defrost method and power, drain pan and drain line design']]}];
+}
+function renderCoil(){
+  buildCoilCtl();
+  const C=S.CO, g=C.g, c=S.G.coil, k=C.clean, i=C.iced;
+  /* sliders */
+  CLS.forEach(gr=>gr[1].forEach(r=>{ const inp=$('#cl-'+r[0]), f=FK[r[0]], v=P[r[0]]; if(document.activeElement!==inp) inp.value=v;
+    $('#clo-'+r[0]).innerHTML=(r[0]==='cNc'&&v===0?g.Ncirc+'<small>auto</small>':nf(v,r[3]<1?(r[3]<0.1?2:1):0)+'<small>'+(f.unit==='pcs'?'':f.unit)+'</small>'); }));
+  $$('#iclCtl [data-arr]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.arr===P.cArr)));
+  /* KPIs */
+  const kv=(l,v,u,hl,sev)=>'<div'+(hl?' class="hl"':'')+'><div class="l">'+l+'</div><div class="v"'+(sev?' style="color:var(--'+sev+')"':'')+'>'+v+(u?'<small>'+u+'</small>':'')+'</div></div>';
+  const au=id=>{ const a=S.AU.find(x=>x.id===id); return a&&(a.sev==='warn'||a.sev==='bad')?a.sev:null; };
+  $('#iclKpi').innerHTML=kv('Fluid inlet needed',nf(i.Tf_in,1),'°C · assumed '+nf(C.T_assumed,0),true,au('coilT'))+kv('UA, clean / iced',nf(k.UA/1000,2)+' / '+nf(i.UA/1000,2),'kW/K',true)+
+    kv('Air-side surface',nf(g.A_o,0),'m² · '+ni(g.nfin)+' fins')+kv('Fin efficiency',k.st.map(s=>nf(s.eta,2)).join(' / '),'',false,au('coilFin'))+
+    kv('Tube side',ni(i.Re),'Re · '+i.regime,false,au('coilRe'))+kv('Fluid flow',nf(i.Vdot*3600,1),'m³/h · '+nf(i.dp_f/1000,0)+' kPa')+
+    kv('Air Δp from geometry',nf(k.dp_air,0),'Pa · input '+nf(C.dp_in,0))+kv('Spray run to defrost',isFinite(C.t_end)?nf(C.t_end/60,0):'—','min at '+nf(C.LWC,1)+' g/m³',false,au('coilIce'));
+  /* resistance split + thermal table */
+  const sh=[['air','Air film and fins','k-spray'],['wall','Tube wall','k-duct'],['tube','Film inside the tubes','k-fan']];
+  const bar=(lab,x)=>'<div class="rw"><span>'+lab+'</span><div class="bar">'+sh.map(s=>'<span title="'+s[1]+' '+nf(x.share[s[0]]*100,0)+'%" style="width:'+(x.share[s[0]]*100).toFixed(1)+'%;background:var(--'+s[2]+')"></span>').join('')+'</div></div>';
+  const tr=(l,a,b)=>'<tr><td>'+l+'</td><td>'+a+'</td><td>'+b+'</td></tr>';
+  $('#iclRes').innerHTML='<h3>Where the temperature difference goes<small>counter-flow ε-NTU</small></h3><div class="cl-rb">'+bar('Clean',k)+bar('Iced',i)+
+    '<div class="lg">'+sh.map(s=>'<span><i style="background:var(--'+s[2]+')"></i>'+s[1]+' '+nf(i.share[s[0]]*100,0)+'%</span>').join('')+'</div></div>'+
+    '<table class="stab mini"><thead><tr><th></th><th>Clean circuit</th><th>Iced circuit (λ_fan)</th></tr></thead><tbody>'+
+    tr('Heat load [kW]',nf(k.Q/1000,1),nf(i.Q/1000,1))+tr('Air in → out [°C]',nf(k.Tin,1)+' → '+nf(k.Tout,1),nf(i.Tin,1)+' → '+nf(i.Tout,1))+
+    tr('Fluid in → out [°C]',nf(k.Tf_in,1)+' → '+nf(k.Tf_out,1),nf(i.Tf_in,1)+' → '+nf(i.Tf_out,1))+
+    tr('Air film, front / main [W/m²K]',k.st.map(s=>nf(s.h,0)).join(' / '),i.st.map(s=>nf(s.he,0)).join(' / '))+tr('Tube film [W/m²K]',nf(k.hi,0),nf(i.hi,0))+
+    tr('Effectiveness ε · NTU',nf(k.eps,2)+' · '+nf(k.NTU,2),nf(i.eps,2)+' · '+nf(i.NTU,2))+tr('Tube velocity [m/s]',nf(k.v,2),nf(i.v,2))+tr('Pump hydraulic power [W]',ni(k.P_pump),ni(i.P_pump))+'</tbody></table>';
+  /* λ(t) with the leading-edge model */
+  const ts=C.curve.ts.map(t=>t/60), ok=C.curve.lams.map((v,j)=>isFinite(v)?j:-1).filter(j=>j>=0);
+  const ser=[{xs:ok.map(j=>ts[j]),ys:ok.map(j=>C.curve.lams[j]),color:'var(--k-hx)',w:2.4,name:'λ, leading-edge model'},{xs:[0,ts[ts.length-1]],ys:[P.lamF,P.lamF],color:'var(--bad)',w:1,dash:'2 3',name:'λ_fan'}];
+  const v16=S.OPS.run[S.SN.length-1].find(r=>Math.abs(r.LWC-P.LWC)<1e-9); if(v16) ser.push({xs:v16.nom.ts.map(t=>t/60).filter(t=>t<=ts[ts.length-1]),ys:v16.nom.lams.slice(0,v16.nom.ts.filter(t=>t/60<=ts[ts.length-1]).length),color:'var(--muted)',w:1.4,dash:'4 3',name:'v1.6 uniform-layer model'});
+  lineChart($('#iclLam .ch'),{series:ser,xl:'spray time [min]',h:250,aria:'Circuit loss ratio against spray time with the leading-edge ice model',vline:isFinite(C.t_end)?C.t_end/60:null,
+    tip:xv=>({x:xv,h:'<b>t = '+nf(xv,0)+' min</b><div class="num"><span>blockage</span><span>'+nf(C.bAt(xv*60),2)+'</span></div><div class="num"><span>λ</span><span>'+(C.bAt(xv*60)<0.995?nf(C.lamAt(xv*60),2):'—')+'</span></div>'})});
+  const tE=isFinite(C.t_end)?C.t_end:3600;
+  $('#iclCap').innerHTML='<h3>Ice on the coil<small>Finstad · Makkonen–Stallabrass · NASA TM-100116</small></h3><div class="ic-kv">'+
+    [['Water flux on the face',nf(C.q_w*1000,2),'g/m²s'],['Horn growth',nf(C.dwdt*6e4,2),'mm/min'],['Capture, bare fin edge',nf(C.cap.edge.E,2),'MVD '+nf(P.MVD,0)+' µm'],['Capture, 4 mm iced edge',nf(C.cap.edge4.E,2),''],
+     ['Capture, first tube row',nf(C.cap.tube.E,2),''],['Rime density [MS]',ni(C.ms.rho),'kg/m³ · input '+nf(P.cRi,0)],['Ice at the defrost trigger',nf(C.iceMass(tE),1),'kg'],['UA lost to the ice layer',nf((1-rateUA(C))*100,1),'%']]
+     .map(x=>'<div><div class="l">'+x[0]+'</div><div class="v">'+x[1]+(x[2]?'<small>'+x[2]+'</small>':'')+'</div></div>').join('')+'</div>';
+  /* specification */
+  $('#iclSpec').innerHTML='<tbody>'+coilSpec().map(G=>'<tr class="grp-h"><td colspan="2">'+esc(G.h)+'</td></tr>'+G.rows.map(r=>'<tr><td>'+esc(r[0])+'</td><td>'+esc(r[1]).replace(/\(estimate\)|\(preliminary model\)|\(to be replaced by the fluid datasheet\)/g,m=>'<span class="est">'+m+'</span>')+'</td></tr>').join('')).join('')+'</tbody>';
+  $('#iclHud').innerHTML='<b>'+g.tubes+'</b> tubes · <b>'+ni(g.nfin)+'</b> fins<br><b>'+nf(g.A_o,0)+'</b> m² · depth <b>'+nf(g.depth*1000,0)+'</b> mm';
+  $('#iclNote').innerHTML='How it is rated: the air leaving the coil is at the total temperature '+nf(C.T0,1)+' °C, because the settling chamber is slow and the test section reaches '+nf(P.T,1)+' °C static only after the contraction. '+
+    'Air side: finned-bundle relation of the VDI Heat Atlas (fitted to individually finned tubes, used here for plate fins as an approximation) with Schmidt\'s fin efficiency. Tube side: Gnielinski when turbulent, Hausen when laminar. Counter-flow effectiveness, which a serpentine of four or more rows approaches. '+
+    'The air-side Δp cross-check (Jakob tube-bank friction plus fin-channel friction) is not verified against its primary source. Ice: leading-edge horn model calibrated on NASA TM-100116, preliminary until fitted to this coil. A manufacturer\'s rating program overrides all of this; the purpose here is a consistent specification and the right questions.';
+  coilModel(); coilIce();
+}
+function rateUA(C){ return C.iced.UA_air/Math.max(1e-9,C.iced.st.reduce((a,s)=>a+s.eo*s.h*C.g.stages.find(x=>x.id===s.id).A_o,0)); }
+
 /* ================= render: fan ================= */
 function renderFan(){
   const R=S.R, f=R.fan, G=S.G, D=G.fan.D, W=420, sc=(W-110)/D, cx=W/2, cy=40+D*sc/2, Hh=D*sc+96, fx=v=>v.toFixed(1);
@@ -1255,7 +1456,7 @@ async function exportPDF(){
   btn.disabled=true; pr.classList.add('on'); st.textContent='Preparing…'; bar.style.width='8%';
   try{
     await loadScript(new URL('icing/sheet.js',location.href).href);
-    await window.IcingSheet.export(Object.assign({},S,{P,FIELDS,GROUPS,PT,TH,helpers:{wallPts,band,pathAt,segAt,vanesAll,ythk,TC,kW,nf,ni,ne,ns}}),sheetOpts(),(f,msg)=>{ bar.style.width=(f*100).toFixed(0)+'%'; if(msg) st.textContent=msg; });
+    await window.IcingSheet.export(Object.assign({},S,{P,FIELDS,GROUPS,PT,TH,COSPEC:coilSpec(),helpers:{wallPts,band,pathAt,segAt,vanesAll,ythk,TC,kW,nf,ni,ne,ns}}),sheetOpts(),(f,msg)=>{ bar.style.width=(f*100).toFixed(0)+'%'; if(msg) st.textContent=msg; });
     st.textContent='Saved '+S.id+'.pdf';
   }catch(err){ console.error(err); st.textContent='Export failed: '+(err&&err.message?err.message:err); }
   finally{ btn.disabled=false; setTimeout(()=>{ pr.classList.remove('on'); bar.style.width='0'; },900); }
@@ -1289,7 +1490,7 @@ function openAudit(id){
 }
 
 /* ================= chapters, rail, transitions ================= */
-const CH=[{id:'itop',name:'Circuit'},{id:'izoom',name:'Icing close-up'},{id:'iaudit',name:'Design audit'},{id:'iloss',name:'Loss loop'},{id:'igeo',name:'Geometry'},{id:'itherm',name:'Thermal & icing'},{id:'iops',name:'Operating cycle'},{id:'ifan',name:'Fan'},{id:'isweep',name:'Speed sweep'},{id:'isheet',name:'Datasheet'}];
+const CH=[{id:'itop',name:'Circuit'},{id:'izoom',name:'Icing close-up'},{id:'iaudit',name:'Design audit'},{id:'iloss',name:'Loss loop'},{id:'igeo',name:'Geometry'},{id:'itherm',name:'Thermal & icing'},{id:'icoil',name:'Coil designer'},{id:'iops',name:'Operating cycle'},{id:'ifan',name:'Fan'},{id:'isweep',name:'Speed sweep'},{id:'isheet',name:'Datasheet'}];
 const PAL={bg:'#03080C',a:'#2C7FAE',b:'#E9FCFF'};
 function ctrans(name,eyebrow,action){ if(window.SL&&SL.gust) SL.gust(name,eyebrow,action,PAL); else action(); }
 function railH(){ return $('#irail').offsetHeight||50; }
@@ -1340,11 +1541,11 @@ function update(fromEdit){
   eh.innerHTML=''; save();
   S=compute();
   if(window.SL_sound) SL_sound.set('closed',{V:S.R.V,shaft:S.R.fan.n_rpm/60,fans:S.G.fan.N,spray:S.G.LWC});
-  const gk=JSON.stringify(FIELDS.filter(f=>!['V','T','p','LWC','MVD','Tlab','RH','etaf','etam','marg','tmarg','Vs','LWCs','leak','psi','nu','fK','Kduz','mCd','mB','hxdp','hxV','hxn','hxf','elK','spCd','spT','ik','ihi','iho','buz1','duvar'].includes(f.k)&&f.g!=='ice'&&f.g!=='ops').map(f=>P[f.k]));
+  const gk=JSON.stringify(FIELDS.filter(f=>!['V','T','p','LWC','MVD','Tlab','RH','etaf','etam','marg','tmarg','Vs','LWCs','leak','psi','nu','fK','Kduz','mCd','mB','hxdp','hxV','hxn','hxf','elK','spCd','spT','ik','ihi','iho','buz1','duvar'].includes(f.k)&&f.g!=='ice'&&f.g!=='ops'&&f.g!=='coil').map(f=>P[f.k]));
   if(gk!==update.gk){ update.gk=gk; PT=buildPath(S.R,S.G); LANES=buildLanes(PT,24); [HV,ZV].forEach(v=>{ if(v.gl) v.gl.upload(LANES); }); layoutHero(); layoutZoom(); buildRail(); drops=[]; }
   else { drawBase(HV); drawFallback(HV); }
   renderHero(); renderZoomCards(); renderAudit(); flagFields(); diffAudit(fromEdit);
-  clearTimeout(slowT); slowT=setTimeout(()=>{ renderLoss(); blueprint(); renderThermal(); renderOps(); renderFan(); renderSweep(); renderSheet(); },110);
+  clearTimeout(slowT); slowT=setTimeout(()=>{ renderLoss(); blueprint(); renderThermal(); renderCoil(); renderOps(); renderFan(); renderSweep(); renderSheet(); },110);
   lastScroll=-1;
 }
 

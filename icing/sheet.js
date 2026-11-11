@@ -312,6 +312,18 @@ async function exportSheet(ST,O,prog){
         'Nominal: the coil catches '+nf(P.fsu*100,0)+'% of the spray water; worst: all of it, with corner 1 at ×'+nf(P.bzC1,1)+'. Cycle = 10 min spray + de-icing (A: whole tunnel to +5 °C, B: coil defrost only) + drain + re-cooling + 15 min set-up. Masses and refrigeration are estimates.',6.8); }
   }
 
+  /* ================= 4b. coil specification (coil.js) ================= */
+  if(O.inc.coil!==false&&ST.COSPEC){
+    prog(0.75,'Coil specification…');
+    head('Coil specification for manufacturers','04b');
+    para('Two-stage plate-fin, round-tube air cooler rated against the heat load of this tunnel. Air side: finned-bundle relation of the VDI Heat Atlas with Schmidt fin efficiency; tube side: Gnielinski (turbulent) or Hausen (laminar); counter-flow effectiveness. Values marked as estimates come from this preliminary rating and are replaced by the manufacturer\'s own. The leading-edge ice model is calibrated on NASA TM-100116 and is preliminary.',7);
+    ST.COSPEC.forEach(g=>{
+      sub(g.h);
+      g.rows.forEach(r=>{ font(FM,'normal',6.8,C.ink); const ls=doc.splitTextToSize(tx(r[1]),W-2*M-50), hh=ls.length*3.1+1.9; need(hh+1);
+        font(FS,'normal',6.8,C.muted); T(r[0],M,y); font(FM,'normal',6.8,C.ink); doc.text(ls,M+50,y); y+=ls.length*3.1-1.6; line(M,y,W-M,y,C.faint,0.15); y+=3.5; });
+      y+=1.5; });
+  }
+
   /* ================= 5. sweep ================= */
   if(O.inc.sweep!==false){
     prog(0.78,'Speed sweep…');

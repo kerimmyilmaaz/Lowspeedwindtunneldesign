@@ -844,6 +844,42 @@ input[type=range]::-moz-range-thumb{width:12px;height:24px;border-radius:4px;bac
     </div>
   </section>
 
+  <section class="blk" id="icoil" aria-labelledby="h-icoil">
+    <div class="shead"><div class="secno" aria-hidden="true">UA</div><div>
+      <p class="eyebrow">Coil designer · VDI Heat Atlas · Schmidt · Gnielinski · Finstad · NASA TM-100116</p>
+      <h2 id="h-icoil" class="irv isplit">Design the coil, tube by tube</h2>
+      <p class="sub irv" style="--i:2">The loss loop only needs the coil's pressure drop. A manufacturer needs more: rows, fin pitch, tube pattern, fluid, the temperature the fluid must arrive at. Set them here and the coil is rated against the heat load of this tunnel: air-side film and fin efficiency, the film inside the tubes, UA, and how long a spray run lasts before leading-edge ice closes the front fins. The drawing follows every change.</p>
+    </div></div>
+    <div class="cl">
+      <div class="cl-top">
+        <div class="cl-stage lab irv" id="iclStage">
+          <div class="cl-cv" id="iclCv"><div class="cl-wait" id="iclWait">3D view loads when you scroll here</div></div>
+          <div class="cl-hud" id="iclHud" aria-live="off"></div>
+          <div class="cl-bar">
+            <div class="iseg cl-views" role="group" aria-label="View"><button type="button" data-v="iso" aria-pressed="true">Iso</button><button type="button" data-v="front">Air inlet</button><button type="button" data-v="side">Headers</button><button type="button" data-v="top">Top</button><button type="button" data-v="back">Outlet</button><button type="button" data-v="fin">Fin gap</button></div>
+            <div class="cl-tog"><button type="button" class="cl-t" data-t="casing" aria-pressed="true">Casing</button><button type="button" class="cl-t" data-t="fins" aria-pressed="true">Fins</button><button type="button" class="cl-t" data-t="cut" aria-pressed="false">Cutaway</button><button type="button" class="cl-t" data-z="0.8" aria-label="Zoom in">+</button><button type="button" class="cl-t" data-z="1.25" aria-label="Zoom out">−</button></div>
+          </div>
+          <div class="cl-ice"><label for="iclIce">Spray time</label><input type="range" id="iclIce" min="0" max="1000" value="0" step="1"><output id="iclIceOut" for="iclIce"></output></div>
+        </div>
+        <div class="cl-ctl irv" id="iclCtl" style="--i:2"></div>
+      </div>
+      <div class="fan ops-kpi irv" id="iclKpi"></div>
+      <div class="ic-card irv" id="iclSec"></div>
+      <div class="ops-two">
+        <div class="ic-card irv" id="iclRes"></div>
+        <div class="ic-card irv" id="iclCap" style="--i:2"></div>
+      </div>
+      <div class="chart irv" id="iclLam"><h3>Circuit loss while ice closes the front fins (preliminary model)</h3><div class="ch"></div></div>
+      <div>
+        <h3 class="ops-h">Specification to send to coil manufacturers</h3>
+        <p class="ops-sub">Duty, geometry proposal, fluid and icing service on one sheet. It is also a page of the PDF datasheet. The manufacturer's own rating replaces the estimates.</p>
+        <div class="tscroll irv"><table class="stab mini cl-spec" id="iclSpec"></table></div>
+        <div class="ds-act" style="margin-top:12px"><button class="btn pri" id="iclCopy" type="button">Copy specification as text</button><span class="note" id="iclCopied" role="status"></span></div>
+        <p class="note" id="iclNote" style="margin:12px 0 0"></p>
+      </div>
+    </div>
+  </section>
+
   <section class="blk" id="iops" aria-labelledby="h-iops">
     <div class="shead"><div class="secno" aria-hidden="true">λ</div><div>
       <p class="eyebrow">kapali_devre_1D.m §10 · buzlu K · isletme_cevrimi</p>
@@ -926,7 +962,7 @@ input[type=range]::-moz-range-thumb{width:12px;height:24px;border-radius:4px;bac
         <label class="ds-f">Project name<input id="dsName" placeholder="Icing wind tunnel" autocomplete="off"></label>
         <div class="two"><label class="ds-f">Prepared by<input id="dsBy" autocomplete="off"></label><label class="ds-f">Organisation<input id="dsOrg" autocomplete="off"></label></div>
         <div class="two"><label class="ds-f">Revision<input id="dsRev" value="A" autocomplete="off"></label><div class="ds-f">Contents<div class="ds-inc" id="dsInc">
-          <label><input type="checkbox" value="geo" checked>Geometry</label><label><input type="checkbox" value="loss" checked>Losses</label><label><input type="checkbox" value="therm" checked>Thermal</label><label><input type="checkbox" value="sweep" checked>Sweep</label><label><input type="checkbox" value="audit" checked>Audit</label><label><input type="checkbox" value="inputs" checked>Inputs</label></div></div></div>
+          <label><input type="checkbox" value="geo" checked>Geometry</label><label><input type="checkbox" value="loss" checked>Losses</label><label><input type="checkbox" value="therm" checked>Thermal</label><label><input type="checkbox" value="coil" checked>Coil</label><label><input type="checkbox" value="sweep" checked>Sweep</label><label><input type="checkbox" value="audit" checked>Audit</label><label><input type="checkbox" value="inputs" checked>Inputs</label></div></div></div>
         <label class="ds-f">Notes (printed on the cover)<textarea id="dsNotes" placeholder="e.g. Coil data still estimated; vendor quote pending."></textarea></label>
         <div class="ds-act">
           <button class="btn pri big" id="dsExport" type="button"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Export datasheet PDF</button>
@@ -3050,4 +3086,6 @@ window.SL={gust,relayout(){ readTheme(); measureDock(); if(TG){ layoutHero(); la
 })();
 </script>
 <script src="icing/engine.js"></script>
+<script src="icing/coil.js"></script>
+<script src="icing/coilview.js"></script>
 <script src="icing/app.js"></script>
