@@ -31,17 +31,19 @@ const GROUPS=[
  {g:'ts', name:'Test section · model',color:KC('test'),ref:'G.a_TS · G.mdl'},
  {g:'d1', name:'First diffuser · circuit width',color:KC('diff'),ref:'G.s12 · G.H'},
  {g:'cor',name:'Corners · turning vanes',color:KC('corner'),ref:'G.vane_*'},
- {g:'fan',name:'Fan section',color:KC('fan'),ref:'G.fan'},
+ {g:'fan',name:'Fan section · hub fairing',color:KC('fan'),ref:'G.fan'},
  {g:'ret',name:'Return leg',color:KC('duct'),ref:'G.s34'},
  {g:'wad',name:'Wide-angle diffuser · heat exchanger',color:KC('hx'),ref:'G.CR · G.hx'},
  {g:'set',name:'Settling chamber',color:KC('set'),ref:'G.dn · G.hc · G.el · G.sp'},
  {g:'noz',name:'Contraction',color:KC('noz'),ref:'G.L_daralma'},
- {g:'th', name:'Thermal budget · margins',color:KC('duct'),ref:'G.yal · G.sizinti'}
+ {g:'th', name:'Thermal budget · margins',color:KC('duct'),ref:'G.yal · G.sizinti'},
+ {g:'ice',name:'Icing scenarios · fan margin',color:KC('model'),ref:'G.buz'},
+ {g:'ops',name:'Operating cycle',color:KC('spray'),ref:'G.isil · G.coz'}
 ];
 const F=(k,g,label,unit,def,m,o)=>Object.assign({k,g,label,unit,def,m},o||{});
 const FIELDS=[
- F('V','op','Design test speed','m/s',40,'G.V_tasarim'),
- F('T','op','Static temperature','°C',-20,'G.T_statik_C',{neg:true}),
+ F('V','op','Design test speed (S2)','m/s',50,'G.V_tasarim'),
+ F('T','op','Static temperature','°C',-35,'G.T_statik_C',{neg:true}),
  F('p','op','Static pressure','Pa',101325,'G.p_statik'),
  F('LWC','op','Liquid water content','g/m³',1.0,'G.LWC_tasarim',{zero:true}),
  F('MVD','op','Median volume diameter','µm',20,'web: icing cloud'),
@@ -52,38 +54,39 @@ const FIELDS=[
  F('mc','ts','Model chord','cm',20,'G.mdl.c'),
  F('mCd','ts','Model drag coefficient (iced)','–',0.10,'G.mdl.Cd',{zero:true}),
  F('mx','ts','Leading edge from TS inlet','cm',35,'G.mdl.x_HK',{zero:true}),
+ F('mB','ts','Barlow model allowance (p.101)','',true,'G.mdl.barlow',{kind:'bool'}),
  F('s12','d1','Corner 1–2 side','cm',75,'G.s12'),
  F('th1','d1','Equivalent cone half-angle θe','°',3.0,'G.thetaD1_der'),
  F('H','d1','Circuit width (leg axes)','cm',320,'G.H'),
  F('safety','d1','Safety screen before corner 2','',false,'G.guvenlik_elegi',{kind:'bool'}),
  F('vc','cor','Vane chord / corner side','–',0.25,'G.vane_c_oran'),
  F('vhc','cor','Vane gap / chord','–',0.25,'G.vane_h_c'),
- F('buz1','cor','Corner 1 icing factor','×',1.5,'G.buz_kose1'),
- F('fw','fan','Fan section width','cm',100,'G.fan.w'),
- F('fh','fan','Fan section height','cm',100,'G.fan.h'),
- F('fN','fan','Number of fans','pcs',4,'G.fan.N',{int:true}),
- F('fD','fan','Fan diameter','cm',45,'G.fan.D'),
- F('fsplit','fan','Splitter plates in transition','pcs',0,'G.fan.ayirici',{int:true,zero:true}),
- F('Lgec','fan','Fan transition length','cm',205,'G.L_gecis'),
- F('Lfan','fan','Fan module length','cm',60,'G.L_fan'),
- F('Lfd','fan','Post-fan contraction length','cm',0,'G.L_fan_daralma',{zero:true}),
- F('fveri','fan','Fan data basis','',"statik",'G.fan.veri',{kind:'seg',opts:[['statik','Static'],['toplam','Total + exit']]}),
- F('fK','fan','Fan module mounting loss K','–',0.05,'G.fan.K_birim',{zero:true}),
- F('etaf','fan','Fan efficiency η','–',0.70,'G.eta_fan'),
- F('etam','fan','Motor efficiency η_m','–',0.88,'G.eta_motor'),
- F('motorIn','fan','Motors inside the airstream','',true,'G.motor_icerde',{kind:'bool'}),
+ F('buz1','cor','Corner 1 icing factor (design)','×',1.5,'G.buz_kose1'),
+ F('fD','fan','Fan diameter (round section)','cm',100,'G.fan.D'),
+ F('Lgec','fan','Transition length, square → round','cm',205,'G.L_gecis'),
+ F('duvar','fan','Max local wall angle (transitions)','°',5.0,'G.duvar_max'),
+ F('Lfan','fan','Fan casing length','cm',70,'G.L_fan'),
+ F('fK','fan','Fan casing loss K (nose, struts)','–',0.05,'G.fan.K_birim',{zero:true}),
+ F('kap','fan','Hub fairing + straightener','',true,'G.fan.kaplama',{kind:'bool'}),
+ F('nuk','fan','Fairing hub ratio d/D','–',0.50,'G.fan.nu_kap'),
+ F('Lkap','fan','Straightener (constant hub) length','cm',52.5,'G.fan.L_kap'),
+ F('Lkapn','fan','Hub closure cone length','cm',97.5,'G.fan.L_kapanis'),
+ F('Kduz','fan','Straightener loss K (annulus q)','–',0.10,'G.fan.K_duz',{zero:true}),
+ F('etaf','fan','Fan efficiency η (estimate)','–',0.75,'G.eta_fan'),
+ F('etam','fan','Motor efficiency η_m','–',0.91,'G.eta_motor'),
+ F('motorIn','fan','Motor inside the airstream','',true,'G.motor_icerde',{kind:'bool'}),
  F('psi','fan','Pressure coefficient ψ (sizing)','–',0.35,'G.fan.psi'),
- F('nu','fan','Hub / tip ratio','–',0.45,'G.fan.nu',{zero:true}),
+ F('nu','fan','Blade hub / tip ratio (sizing)','–',0.32,'G.fan.nu',{zero:true}),
  F('marg','fan','Fan selection margin','×',1.5,'G.marj_fan'),
  F('s34','ret','Corner 3–4 side','cm',100,'G.s34'),
  F('th3','ret','Return diffuser θe','°',3.5,'G.thetaD3_der'),
  F('CR','wad','Contraction ratio CR','–',9.0,'G.CR'),
- F('gad2th','wad','WAD total wall angle 2θ','°',40,'G.GAD_2theta'),
+ F('gad2th','wad','WAD equivalent total angle 2θe','°',35,'G.GAD_2theta'),
  F('yer','wad','Heat exchanger position','',"birlikte",'G.yerlesim',{kind:'seg',opts:[['birlikte','At WAD exit'],['ayri','In leg 3–4']]}),
  F('hxdp','wad','Coil Δp at reference velocity','Pa',100,'G.hx.dp_ref'),
  F('hxV','wad','Coil reference face velocity','m/s',4.5,'G.hx.V_ref'),
  F('hxn','wad','Velocity exponent n','–',1.8,'G.hx.n_us'),
- F('hxf','wad','Frost factor','×',1.3,'G.hx.karlanma'),
+ F('hxf','wad','Coil frost factor (design)','×',1.0,'G.hx.karlanma'),
  F('thx','wad','Coil depth','cm',10,'G.dn.t_hx'),
  F('gN','wad','WAD screens (leg 3–4 layout)','pcs',2,'G.gad_el.N',{int:true,zero:true}),
  F('gdw','wad','WAD screen wire d','mm',0.5,'G.gad_el.dw'),
@@ -111,12 +114,28 @@ const FIELDS=[
  F('ihi','th','Inner film coefficient','W/m²K',30,'G.yal.h_ic'),
  F('iho','th','Outer film coefficient','W/m²K',8,'G.yal.h_dis'),
  F('tmarg','th','Refrigeration selection margin','×',1.3,'G.isil_marj'),
- F('Vs','th','Continuous cooling point speed','m/s',30,'G.V_surekli'),
- F('LWCs','th','Continuous cooling point LWC','g/m³',1.0,'G.LWC_surekli',{zero:true}),
- F('leak','th','Leakage and joints factor','×',1.10,'G.sizinti')
+ F('Vs','th','Second scenario speed (S1)','m/s',25,'G.V_surekli · G.sen.V(1)'),
+ F('LWCs','th','S1 cooling-point LWC','g/m³',1.0,'G.LWC_surekli',{zero:true}),
+ F('leak','th','Leakage and joints factor','×',1.10,'G.sizinti'),
+ F('lamF','ice','Fan icing margin λ_fan','×',2.0,'G.buz.lam_fan'),
+ F('bzHx','ice','Iced coil Δp factor [NA2]','×',3.0,'G.buz.hx'),
+ F('bzC1','ice','Severe corner-1 K factor [NO]','×',5.4,'G.buz.kose1_siddetli'),
+ F('bzSt','ice','2D-model diffuser stall, power factor [B]','×',2.5,'G.buz.stall_guc'),
+ F('Qk','ops','Refrigeration capacity','kW',45,'G.isil.Q_sec'),
+ F('dTy','ops','Air – secondary fluid approach','K',12,'G.isil.dTy'),
+ F('dTa','ops','Allowed temperature drift in a run','K',1.0,'G.isil.dT_izin'),
+ F('tic','ops','Inner shell thickness (Al)','mm',2,'G.isil.t_ic'),
+ F('mhx','ops','Coil metal mass','kg',300,'G.isil.m_hx',{zero:true}),
+ F('mic','ops','Internal hardware mass','kg',250,'G.isil.m_ic',{zero:true}),
+ F('pitch','ops','Coil fin pitch','mm',7.0,'G.hx.hatve'),
+ F('fsu','ops','Spray water caught by the coil (nominal)','–',0.5,'G.hx.f_su(1)'),
+ F('bmax','ops','Allowed coil blockage b_max','–',0.70,'G.hx.b_max'),
+ F('Pis','ops','De-icing air heater (A)','kW',20,'G.coz.P_isit'),
+ F('Pdef','ops','Coil defrost power (B)','kW',10,'G.coz.P_def'),
+ F('tday','ops','Working day','h',8,'G.isil.t_gun')
 ];
 const FK={}; FIELDS.forEach(f=>FK[f.k]=f);
-const EXTRA={fcQ:'',fcdp:'',fcrho:1.394,fcname:''};
+const EXTRA={fcQ:'',fcdp:'',fcrho:1.204,fcname:''};
 function defaults(){ const p={}; FIELDS.forEach(f=>p[f.k]=f.def); return Object.assign(p,EXTRA); }
 
 function validate(p){
@@ -130,11 +149,16 @@ function validate(p){
   });
   if(e.length) return e;
   if(p.T<=-273.15) e.push('Temperature must be above −273.15 °C.');
-  ['etaf','etam','hcB'].forEach(k=>{ if(p[k]>1) e.push(FK[k].label+' must not exceed 1.'); });
-  if(p.nu>=1) e.push('Hub / tip ratio must be below 1.');
+  ['etaf','etam','hcB','fsu'].forEach(k=>{ if(p[k]>1) e.push(FK[k].label+' must not exceed 1.'); });
+  if(p.nu>=1) e.push('Blade hub / tip ratio must be below 1.');
+  if(p.nuk>=1) e.push('Fairing hub ratio must be below 1.');
+  if(p.bmax>=0.98) e.push('Allowed coil blockage must be below 0.98.');
+  if(p.pitch<=0.2) e.push('Coil fin pitch must exceed the 0.2 mm fin thickness.');
+  if(p.duvar>=45) e.push('Wall angle limit must be below 45°.');
+  if(p.lamF<1) e.push('Fan icing margin λ_fan cannot be below 1.');
   if(p.RH>100) e.push('Relative humidity must not exceed 100%.');
-  if(p.fN<1) e.push('At least one fan is needed.');
   if(p.spNn<1) e.push('At least one nozzle is needed.');
+  if(p.Tlab<=p.T) e.push('Laboratory temperature must be above the test temperature.');
   if(p.s12<=p.a) e.push('Corner 1–2 side must exceed the test-section side (first diffuser needs AR > 1).');
   if(p.H<=Math.max(p.s12,p.s34)) e.push('Circuit width H must exceed both corner sizes.');
   if(p.a*Math.sqrt(p.CR)<=p.s34) e.push('Settling chamber (a·√CR = '+nf(p.a*Math.sqrt(p.CR),0)+' cm) must be larger than corner 3–4 ('+p.s34+' cm) for the wide-angle diffuser.');
@@ -147,7 +171,7 @@ function validate(p){
 }
 
 /* ================= state ================= */
-const LS='smokeline.icing.v1';
+const LS='smokeline.icing.v2';   /* v2: kapali_devre_1D.m v1.6 inputs (single round fan, −35 °C); v1 values are not carried over */
 let P=defaults();
 try{ const s=JSON.parse(localStorage.getItem(LS)||'null'); if(s&&typeof s==='object') for(const k in P) if(k in s) P[k]=s[k]; }catch(_){}
 function save(){ try{ localStorage.setItem(LS,JSON.stringify(P)); }catch(_){} }
@@ -174,10 +198,11 @@ function designId(){
 function buildG(p){
   const cm=0.01, mm=1e-3, xel=[];
   for(let k=0;k<p.elN;k++) xel.push(p.xel*cm+k*p.del*cm);
+  const D=p.fD*cm, wq=D*Math.sqrt(Math.PI)/2;     /* round fan section carried as the square of equal area */
   return {Tc:p.T,p:p.p,Tlab:p.Tlab,RH:p.RH,LWC:p.LWC,MVD:p.MVD,
-    a:p.a*cm,L_TS:p.LTS*cm,s12:p.s12*cm,th1:p.th1,H:p.H*cm,
-    fan:{w:p.fw*cm,h:p.fh*cm,N:p.fN,D:p.fD*cm,veri:p.fveri,K:p.fK,psi:p.psi,nu:p.nu,split:p.fsplit},
-    L_gecis:p.Lgec*cm,L_fan:p.Lfan*cm,L_fd:p.Lfd*cm,eta_fan:p.etaf,eta_m:p.etam,motorIn:p.motorIn,
+    a:p.a*cm,L_TS:p.LTS*cm,s12:p.s12*cm,th1:p.th1,H:p.H*cm,duvar:p.duvar,
+    fan:{D,w:wq,h:wq,N:1,K:p.fK,psi:p.psi,nu:p.nu,kap:p.kap,nuk:p.nuk,L_kap:p.Lkap*cm,L_kapn:p.Lkapn*cm,Kduz:p.Kduz},
+    L_gecis:p.Lgec*cm,L_fan:p.Lfan*cm,eta_fan:p.etaf,eta_m:p.etam,motorIn:p.motorIn,
     s34:p.s34*cm,th3:p.th3,CR:p.CR,gad2th:p.gad2th,L_dn:p.Ldn*cm,L_c:p.Lc*cm,
     dn:{x_hx:0,t_hx:p.thx*cm,x_hc:p.xhc*cm,x_el:xel,x_sp:p.xsp*cm},
     vane_c:p.vc,vane_hc:p.vhc,buz1:p.buz1,safety:p.safety,
@@ -186,28 +211,35 @@ function buildG(p){
     gel:{N:p.gN,dw:p.gdw*mm,wm:p.gwm*mm,Kmesh:1.3},
     hx:{dp_ref:p.hxdp,V_ref:p.hxV,n:p.hxn,frost:p.hxf,der:0},
     sp:{N:p.spN,d:p.spd*mm,Cd:p.spCd,Nn:p.spNn,Tw:p.spT},
-    mdl:{c:p.mc*cm,b:p.a*cm,Cd:p.mCd,x:p.mx*cm},
+    mdl:{c:p.mc*cm,b:p.a*cm,Cd:p.mCd,x:p.mx*cm,barlow:p.mB},
     ins:{t:p.it*mm,k:p.ik,hi:p.ihi,ho:p.iho},
-    leak:p.leak,marg:p.marg,tmarg:p.tmarg,Vs:p.Vs,LWCs:p.LWCs};
+    leak:p.leak,marg:p.marg,tmarg:p.tmarg,Vs:p.Vs,LWCs:p.LWCs,
+    buz:{lamF:p.lamF,hx:p.bzHx,c1:p.bzC1,stall:p.bzSt},
+    /* operating cycle (kapali_devre_1D.m §10); the constants are the v1.6 estimates */
+    ops:{t_ic:p.tic*mm,rho_ic:2700,c_ic:900,rho_yal:40,c_yal:1400,f_yal:0.5,m_hx:p.mhx,c_hx:480,V_sivi:0.05,rho_sivi:800,c_sivi:2000,m_ic:p.mic,c_icd:600,
+      Q_sec:p.Qk*1e3,Q_kap:[p.Qk*1e3*2/3,p.Qk*1e3,p.Qk*1e3*4/3],dTy:p.dTy,E_tampon:0,V_sog:15,tol:0.5,dT_izin:p.dTa,w0:0.0073,t_max:120,t_gun:p.tday,
+      LWC:[0.25,0.5,1,2],hatve:p.pitch*mm,t_kanat:0.2e-3,L_buz:0.05,rho_buz:600,f_su:[p.fsu,1.0],n_tik:2.5,b_max:p.bmax,
+      coz:{T_son:5,P_isit:p.Pis*1e3,V_fan:15,P_def:p.Pdef*1e3,eta_def:0.6,n_drain:2,d_drain:0.025,h_drain:0.10,t_suz:10,t_hazir:15}}};
 }
 function parseList(s){ return String(s||'').split(/[\s;,]+/).map(x=>x.trim()).filter(Boolean).map(Number).filter(isFinite); }
 function curve(){
   const Q=parseList(P.fcQ), dp=parseList(P.fcdp);
   if(Q.length<2||Q.length!==dp.length) return null;
   for(let i=1;i<Q.length;i++) if(!(Q[i]>Q[i-1])) return null;
-  return {Q,dp,rho:+P.fcrho||1.394,name:P.fcname||'fan curve'};
+  return {Q,dp,rho:+P.fcrho||1.204,name:P.fcname||'fan curve'};
 }
 
 /* ================= compute ================= */
 let S=null;   // current state bundle
 function compute(){
   const h=E.air(P.T,P.p), G=buildG(P);
-  const R=E.circuit(G,P.V,P.yer,h);
-  const TB=E.thermal(R,G,P.LWC,h), Rs=E.circuit(G,P.Vs,P.yer,h), TBs=E.thermal(Rs,G,P.LWCs,h);
+  const R=E.circuit(G,P.V,P.yer,h), SN=E.scenarios(G,P.V,P.yer,h,R), Rs=SN[0].R;
+  const TB=E.thermal(R,G,P.LWC,h), TBs=E.thermal(Rs,G,P.LWCs,h);
   const IC=E.icing(R,G,h), AU=E.audit(R,G,h,IC), GT=E.geometryTable(R), FC=E.fanPoint(R,G,curve());
   const Ralt=E.circuit(G,P.V,P.yer==='ayri'?'birlikte':'ayri',h);
-  const Vmax=Math.max(50,Math.ceil(P.V*1.25/5)*5), SW=E.sweep(G,P.yer,h,Vmax);
-  return {h,G,R,TB,Rs,TBs,IC,AU,GT,FC,Ralt,SW,id:designId()};
+  const Vmax=Math.max(55,Math.ceil(P.V*1.1/5)*5), SW=E.sweep(G,P.yer,h,Vmax);
+  const ICE=SN.map(s=>E.iced(G,s)), FR=E.fanReq(G,SN), OPS=E.ops(G,SN);
+  return {h,G,R,TB,Rs,TBs,IC,AU,GT,FC,Ralt,SW,SN,ICE,FR,OPS,id:designId()};
 }
 
 /* ================= path geometry (plan view, metres) =================
@@ -229,6 +261,8 @@ function buildPath(R,G){
   let xu=X-s12/2;
   St('gec','diff',[xu,H],[-1,0],g.L_gecis,s12,fw,s12,fh); xu-=g.L_gecis;
   St('fan','fan',[xu,H],[-1,0],g.L_fan,fw,fw,fh,fh); xu-=g.L_fan;
+  St('kap','fan',[xu,H],[-1,0],g.L_kap,fw,fw,fh,fh); xu-=g.L_kap;
+  St('kapn','fan',[xu,H],[-1,0],g.L_kapn,fw,fw,fh,fh); xu-=g.L_kapn;
   St('d3','diff',[xu,H],[-1,0],g.L_D3,fw,s34,fh,s34); xu-=g.L_D3;
   St('ust','duct',[xu,H],[-1,0],g.L_ust,s34,s34,s34,s34);
   Cn('c3',[0,H],[-1,0],[0,-1],s34);
@@ -239,8 +273,7 @@ function buildPath(R,G){
   St('noz','noz',[s34/2+g.L_GAD+g.L_dn,0],[1,0],g.L_c,sdn,a,sdn,a,'poly');
   const byId={}; segs.forEach(q=>byId[q.id]=q);
   const P={segs,L:s,byId,x0,sLE:G.mdl.x,c:G.mdl.c,A_TS:a*a};
-  P.ext={x0:-Math.max(s34,fw)/2,x1:X+s12/2,y0:-sdn/2,y1:H+Math.max(s34,fw,fh>fw?fw:fw)/2};
-  P.ext.y1=H+Math.max(s34,fw)/2;
+  P.ext={x0:-Math.max(s34,fw)/2,x1:X+s12/2,y0:-sdn/2,y1:H+Math.max(s34,fw)/2};
   /* locations of elements that are not path segments */
   const dn=byId.dn, l34=byId.l34;
   P.at_hx=G&&R.yer==='ayri'?(l34?l34.s0+l34.L*0.5:0):(dn?dn.s0+G.dn.x_hx:0);
@@ -464,7 +497,7 @@ function drawLabels(v){
   if(B.noz) lab(B.noz.s0+B.noz.L*0.55,small?'Nozzle':'Contraction','CR '+nf(P.CR,1),TH['k-noz']);
   if(B.d1&&!small) lab(B.d1.s0+B.d1.L*0.5,'Diffuser 1','θe '+nf(P.th1,1)+'°',TH['k-diff']);
   if(B.gad&&!small) lab(B.gad.s0+B.gad.L*0.5,'Wide-angle diffuser','2θ '+nf(P.gad2th,0)+'°',TH['k-diff']);
-  if(B.fan) lab(B.fan.s0+B.fan.L*0.5,'Fans ×'+P.fN,'Ø'+nf(P.fD,0)+' cm · '+kW(R.P_mil).v+' '+kW(R.P_mil).u+' shaft',TH['k-fan'],true);
+  if(B.fan) lab(B.fan.s0+B.fan.L*0.5,'Fan Ø'+nf(P.fD,0)+' cm',(P.kap?'hub fairing · ':'')+kW(R.P_mil).v+' '+kW(R.P_mil).u+' shaft',TH['k-fan'],true);
   if(B.gec&&!small) lab(B.gec.s0+B.gec.L*0.5,'Fan transition','',TH['k-diff'],true);
   if(B.ust&&B.ust.L>0.3&&!small) lab(B.ust.s0+B.ust.L*0.5,'Return duct','',TH['k-duct'],true);
   c.font=fN;
@@ -523,9 +556,9 @@ function leX(y){ /* surface x (from LE) at lateral |y| */
 function drawTop(v,now){
   const c=v.ctxT; c.clearRect(0,0,v.W,v.H); if(!PT||!S) return;
   const k=v.cam.k, G=S.G;
-  /* fans: blade-passing shimmer along each rotor line */
+  /* fan: blade-passing shimmer along the rotor line (drawn across the equal-area duct width) */
   const fq=PT.byId.fan;
-  if(fq){ const o=segAt(fq,fq.L*0.5), nc=S.R.fan.ncol, D=G.fan.D;
+  if(fq){ const o=segAt(fq,fq.L*0.5), nc=S.R.fan.ncol, D=Math.min(G.fan.D,o.w);
     for(let i=0;i<nc;i++){ const lat=(-1+(2*i+1)/nc)*o.w/2, cx=o.x+o.nx*lat, cy=o.y+o.ny*lat;
       const x1=SX(v,cx+o.nx*D/2), y1=SY(v,cy+o.ny*D/2), x2=SX(v,cx-o.nx*D/2), y2=SY(v,cy-o.ny*D/2);
       c.strokeStyle=TH['k-fan']; c.lineWidth=k>150?4:2.5; c.lineCap='round'; c.globalAlpha=.9; c.beginPath(); c.moveTo(x1,y1); c.lineTo(x2,y2); c.stroke();
@@ -596,7 +629,7 @@ function layoutHero(){
 let ZKF=[], zActive=-1;
 const ZST=[
   {id:'sp',name:'Spray bars',key:'spray'},{id:'noz',name:'Contraction',key:'noz'},{id:'model',name:'Ice on the model',key:'model'},
-  {id:'c1',name:'Corner 1',key:'corner'},{id:'fan',name:'Fan array',key:'fan'},{id:'hx',name:'Heat exchanger',key:'hx'}
+  {id:'c1',name:'Corner 1',key:'corner'},{id:'fan',name:'Fan',key:'fan'},{id:'hx',name:'Heat exchanger',key:'hx'}
 ];
 function layoutZoom(){
   const v=ZV, W=v.root.clientWidth, H=v.root.clientHeight; if(!W||!H||!PT) return;
@@ -659,14 +692,14 @@ function renderZoomCards(){
       note:'Droplets near the stagnation line cannot follow the streamlines and hit the leading edge (Langmuir inertia K₀ = '+nf(IC.K0,2)+'). Expected regime: '+(IC.regime==='none'?'no accretion':IC.regime)+'. Ice grows here in time-lapse ×'+TLAPSE+'.'},
     {k:'corner',st:[['V',nf(by('c1').V,1),'m/s'],['K × icing',nf(P.buz1,2),''],['Δp',nf(by('c1').dp,0),'Pa']],
       note:'Whatever passes the model is caught by the first turning vanes. They frost up during a run, which is why their loss is multiplied by '+nf(P.buz1,2)+' and why heated vanes are worth planning.'},
-    {k:'fan',st:[['Δp needed',ni(R.dp_top*G.marg),'Pa'],['Shaft',kW(R.P_mil).v,kW(R.P_mil).u],['Heat in',kW(TB.fan+TB.motor).v,kW(TB.fan+TB.motor).u]],
-      note:P.fN+' fans in a '+fan.ncol+'×'+fan.nrow+' array restore the '+nf(R.dp_top,0)+' Pa lost round the loop. Every watt of shaft power ends up as heat in the air'+(P.motorIn?', plus the motor losses since the motors sit in the stream':'')+'.'},
+    {k:'fan',st:[['Δp, iced (λ '+nf(P.lamF,1)+')',ni(R.dp_top*P.lamF),'Pa'],['Shaft',kW(R.P_mil).v,kW(R.P_mil).u],['Heat in',kW(TB.fan+TB.motor).v,kW(TB.fan+TB.motor).u]],
+      note:'One Ø'+nf(P.fD,0)+' cm axial fan'+(P.kap?' with a hub fairing and straightener':'')+' restores the '+nf(R.dp_top,0)+' Pa lost round the clean loop, and must keep doing so as ice raises the loss to λ_fan × that. Every watt of shaft power ends up as heat in the air'+(P.motorIn?', plus the motor losses since the motor sits in the stream':'')+'.'},
     {k:'hx',st:[['Face V',nf(R.hx.V,2),'m/s'],['Δp',nf(R.hx.dp,0),'Pa'],['Cooling',kW(TB.sec).v,kW(TB.sec).u]],
       note:'The coil removes fan heat, wall heat and the latent heat of the spray water: '+kW(TB.top).v+' '+kW(TB.top).u+' at the design point, '+kW(TB.sec).v+' '+kW(TB.sec).u+' with the selection margin. It is also the largest single loss in the circuit.'}
   ];
   $('#izCards').innerHTML=C.map((s,i)=>'<article class="fc" aria-hidden="true"><div class="fc-top"><span>'+pad2(i+1)+' / 06</span><span>'+ZST[i].name+'</span></div>'+
     '<h3><i style="background:'+KC(s.k)+'"></i>'+ZST[i].name+'</h3><dl class="fc-st">'+s.st.map(x=>'<div><dt>'+x[0]+'</dt><dd>'+x[1]+(x[2]?'<small>'+x[2]+'</small>':'')+'</dd></div>').join('')+'</dl>'+
-    '<p>'+s.note+'</p><button class="fc-go" type="button" data-igo="'+(i===2?'itherm':i===4?'ifan':i===5?'itherm':'iloss')+'">'+(i===2||i===5?'Thermal & icing':i===4?'Fan array':'Loss loop')+' →</button></article>').join('');
+    '<p>'+s.note+'</p><button class="fc-go" type="button" data-igo="'+(i===2?'itherm':i===4?'ifan':i===5?'iops':'iloss')+'">'+(i===2?'Thermal & icing':i===4?'Fan':i===5?'Operating cycle':'Loss loop')+' →</button></article>').join('');
   if(!$('#izDots').children.length){
     $('#izDots').innerHTML=ZST.map((s,i)=>'<li><button type="button" data-zi="'+i+'">'+s.name+'<i></i></button></li>').join('');
     $$('#izDots button').forEach(b=>b.addEventListener('click',()=>{ const sec=$('#izoom'), total=sec.offsetHeight-ZV.root.clientHeight, top=sec.getBoundingClientRect().top+scrollY;
@@ -682,8 +715,8 @@ function renderIceMeter(){
 }
 
 /* ================= probe (hover the hero) ================= */
-const SEG_COMP={ts:['ts','model'],d1:['d1'],c1:['c1'],l12:['l12','safe'],c2:['c2'],gec:['gec'],fan:['fan','borda'],d3:['d3'],ust:['ust'],c3:['c3'],l34:['l34'],c4:['c4'],gad:[],dn:[],noz:['noz']};
-const SEG_NAME={ts:'Test section',d1:'First diffuser',c1:'Corner 1',l12:'Duct 1–2',c2:'Corner 2',gec:'Fan transition',fan:'Fan section',d3:'Return diffuser',ust:'Return duct',c3:'Corner 3',l34:'Duct 3–4',c4:'Corner 4',gad:'Wide-angle diffuser',dn:'Settling chamber',noz:'Contraction'};
+const SEG_COMP={ts:['ts','model'],d1:['d1'],c1:['c1'],l12:['l12','safe'],c2:['c2'],gec:['gec'],fan:['fan','borda'],kap:['kap'],kapn:['kapn'],d3:['d3'],ust:['ust'],c3:['c3'],l34:['l34'],c4:['c4'],gad:[],dn:[],noz:['noz']};
+const SEG_NAME={ts:'Test section',d1:'First diffuser',c1:'Corner 1',l12:'Duct 1–2',c2:'Corner 2',gec:'Fan transition',fan:'Fan',kap:'Hub fairing + straightener',kapn:'Hub closure cone',d3:'Return diffuser',ust:'Return duct',c3:'Corner 3',l34:'Duct 3–4',c4:'Corner 4',gad:'Wide-angle diffuser',dn:'Settling chamber',noz:'Contraction'};
 function segComps(id){
   const R=S.R;
   if(id==='gad') return R.bil.filter(b=>b.id==='gad'||/^gs/.test(b.id)||(b.id==='hx'&&R.yer==='birlikte'));
@@ -745,13 +778,13 @@ function auditWhere(id){
    A fix is only offered if it does not push any other check to a warning or worse. */
 const SOLVE={
  d1:[{k:'th1',to:0.5,step:0.1},{k:'s12',to:p=>p.a+1,step:1}],
- gec:[{k:'Lgec',to:p=>p.Lgec*4,step:5},{k:'fsplit',to:6,step:1}],
- gecw:[{k:'fsplit',to:6,step:1},{k:'Lgec',to:p=>p.Lgec*4,step:5}],
+ gec:[{k:'Lgec',to:p=>p.Lgec*4,step:5}],
+ gecw:[{k:'Lgec',to:p=>p.Lgec*4,step:5}],
+ kapn:[{k:'Lkapn',to:p=>p.Lkapn*4,step:2.5},{k:'nuk',to:0.2,step:0.01}],
  d3:[{k:'th3',to:0.5,step:0.1}],
- d3c:[{k:'Lfd',to:p=>Math.max(300,p.Lfd*4),step:5}],
  arc:[{k:'s34',to:p=>p.a+1,step:1},{k:'s12',to:p=>p.a+1,step:1}],
  gad:[{k:'gN',to:8,step:1},{k:'s34',to:p=>p.a*Math.sqrt(p.CR)-1,step:1}],
- gadg:[{k:'gad2th',to:20,step:1}],
+ gadg:[{k:'gad2th',to:16,step:0.5},{k:'gN',to:3,step:1}],
  cr:[{k:'CR',to:6,step:0.1}],
  cl:[{k:'Lc',to:p=>p.Lc*3,step:5}],
  hc:[{set:p=>({hcL:Math.round(7*p.hcD),hcB:Math.max(p.hcB,0.8)})}],
@@ -761,9 +794,10 @@ const SOLVE={
  lay:[{k:'Ldn',to:p=>p.Ldn*3,step:5}],
  hxv:[{set:p=>p.yer==='ayri'?{yer:'birlikte'}:null},{k:'CR',to:16,step:0.1}],
  vane:[{set:()=>({vhc:0.25})}],
- ffit:[{k:'fD',to:5,step:1},{k:'fw',to:p=>p.fw*3,step:5}],
- fcov:[{k:'fD',to:p=>p.fD*3,step:1}],
- ftip:[{k:'fN',to:p=>p.fN*4,step:1},{k:'fD',to:p=>p.fD*3,step:1}],
+ ftip:[{k:'fD',to:p=>p.fD*2,step:1},{k:'psi',to:0.8,step:0.01}],
+ lamf:[{k:'lamF',to:4,step:0.05},{k:'hxdp',to:10,step:5}],
+ evap:[{k:'dTy',to:4,step:0.5}],
+ qcap:[{k:'Qk',to:p=>p.Qk*4,step:1},{k:'LWC',to:0.1,step:0.05}],
  fmarg:[{set:()=>({marg:1.3})}],
  close:[{k:'Ldn',to:p=>p.Ldn*4,step:5},{k:'Lgec',to:p=>p.Lgec/4,step:5}],
  gap:[{k:'H',to:p=>p.H*3,step:5}],
@@ -893,7 +927,7 @@ function renderLoss(){
   s+='<path d="M'+f(X(x))+','+f(Y(0))+'V'+f(Y(R.dp_top))+'" style="stroke:var(--k-fan)" stroke-width="3"/><path d="M'+f(X(x)-5)+','+f(Y(R.dp_top)+9)+'l5,-9l5,9" style="stroke:var(--k-fan);fill:none" stroke-width="2"/>';
   s+='<text x="'+f(X(x)-8)+'" y="'+f(Y(R.dp_top*0.5))+'" text-anchor="end" style="fill:var(--k-fan);font:600 11px var(--f-mono)">fan +'+ni(R.dp_top)+' Pa</text>';
   /* leg labels along the x axis */
-  const legs=[['Return leg',['d3','ust','c3','l34']],['WAD · settling',['c4','gad','hx','dn','noz']],['Test leg',['ts','model','d1','c1']],['To the fan',['l12','c2','gec','fan']]];
+  const legs=[['Return leg',['kap','kapn','d3','ust','c3','l34']],['WAD · settling',['c4','gad','hx','dn','noz']],['Test leg',['ts','model','d1','c1']],['To the fan',['l12','c2','gec','fan']]];
   legs.forEach(L=>{ const gs=segs.filter(g=>L[1].includes(g.b.id)); if(!gs.length) return; const a=Math.min(...gs.map(g=>g.x0)), b=Math.max(...gs.map(g=>g.x1));
     s+='<text x="'+f((X(a)+X(b))/2)+'" y="'+(H-m.b+18)+'" text-anchor="middle" style="fill:var(--muted);font:11px var(--f-body)">'+L[0]+'</text><path d="M'+f(X(a)+2)+','+(H-m.b+6)+'H'+f(X(b)-2)+'" style="stroke:var(--line)" stroke-width="1"/>'; });
   s+='<text x="'+(m.l)+'" y="'+(H-4)+'" style="fill:var(--muted);font:11px var(--f-body)">flow direction → (from fan exit, one lap; zero-length elements drawn 0.6 m wide)</text></svg>';
@@ -1000,7 +1034,7 @@ function blueprint(){
   const v={cam:{ox:mL-ex.x0*k,oy:top+ex.y1*k,k}}, X=x=>v.cam.ox+x*k, Y=y=>v.cam.oy-y*k, f=n=>n.toFixed(1), toD=pts=>pts.map((p,i)=>(i?'L':'M')+f(p[0])+','+f(p[1])).join('')+'Z';
   const cmv=m=>nf(m*100,0);
   let o='<path class="fillp" fill-rule="evenodd" d="'+toD(wallPts(v,-1))+toD(wallPts(v,1))+'"/>';
-  o+='<g class="an" data-k="a CR s12 s34 H fw fh Lc Ldn LTS"><path class="wall" d="'+toD(wallPts(v,-1))+'"/><path class="wall" d="'+toD(wallPts(v,1))+'"/></g>';
+  o+='<g class="an" data-k="a CR s12 s34 H fD Lc Ldn LTS"><path class="wall" d="'+toD(wallPts(v,-1))+'"/><path class="wall" d="'+toD(wallPts(v,1))+'"/></g>';
   const dimH=(xa,xb,y,txt,kk)=>'<g class="an" data-k="'+kk+'"><path class="dim" d="M'+f(xa)+','+f(y)+'H'+f(xb)+'M'+f(xa)+','+f(y-6)+'v12M'+f(xb)+','+f(y-6)+'v12"/><text class="dt" x="'+f((xa+xb)/2)+'" y="'+f(y-0.6*fs)+'" text-anchor="middle">'+txt+'</text></g>';
   const dimV=(x,ya,yb,txt,kk,anchor)=>'<g class="an" data-k="'+kk+'"><path class="dim" d="M'+f(x)+','+f(ya)+'V'+f(yb)+'M'+f(x-6)+','+f(ya)+'h12M'+f(x-6)+','+f(yb)+'h12"/><text class="dt" x="'+f(anchor==='end'?x-0.7*fs:x+0.7*fs)+'" y="'+f((ya+yb)/2+0.35*fs)+'" text-anchor="'+(anchor||'start')+'">'+txt+'</text></g>';
   /* components */
@@ -1011,8 +1045,11 @@ function blueprint(){
     o+='<g class="an" data-k="elN eldw elwm elK xel del"><path class="hc" stroke-dasharray="3 3" d="'+G.dn.x_el.map(x=>{ const l=crossLine(v,B.dn.s0+x,1); return 'M'+f(l[0][0])+','+f(l[0][1])+'L'+f(l[1][0])+','+f(l[1][1]); }).join('')+'"/></g>';
     const sp=pathAt(PT,PT.at_sp), per=Math.max(1,Math.round(G.sp.Nn/Math.max(1,G.sp.N)));
     o+='<g class="an" data-k="xsp spN spd spCd spNn">'; for(let i=0;i<per;i++){ const lat=(-1+(2*i+1)/per)*sp.w/2*0.9; o+='<circle class="spd" cx="'+f(X(sp.x+sp.nx*lat))+'" cy="'+f(Y(sp.y+sp.ny*lat))+'" r="'+f(2.4*K)+'"/>'; } o+='</g>'; }
-  if(B.fan){ const fo=segAt(B.fan,B.fan.L*0.5), nc=R.fan.ncol; o+='<g class="an" data-k="fN fD fw fh Lfan">'; for(let i=0;i<nc;i++){ const lat=(-1+(2*i+1)/nc)*fo.w/2, cx=fo.x+fo.nx*lat, cy=fo.y+fo.ny*lat;
-    o+='<path class="fanl" d="M'+f(X(cx+fo.nx*G.fan.D/2))+','+f(Y(cy+fo.ny*G.fan.D/2))+'L'+f(X(cx-fo.nx*G.fan.D/2))+','+f(Y(cy-fo.ny*G.fan.D/2))+'"/>'; } o+='</g>'; }
+  if(B.fan){ const fo=segAt(B.fan,B.fan.L*0.5), hw=fo.w/2; o+='<g class="an" data-k="fD Lfan fK">';
+    o+='<path class="fanl" d="M'+f(X(fo.x+fo.nx*hw))+','+f(Y(fo.y+fo.ny*hw))+'L'+f(X(fo.x-fo.nx*hw))+','+f(Y(fo.y-fo.ny*hw))+'"/></g>'; }
+  if(B.kap){ /* enlarged hub through the straightener, then the closure cone */
+    const y=B.kap.p[1], rh=G.fan.nuk*G.fan.D/2, sx=B.kap.d[0], x0=B.kap.p[0], x1=x0+sx*B.kap.L, x2=B.kapn?B.kapn.p[0]+sx*B.kapn.L:x1;
+    o+='<g class="an" data-k="kap nuk Lkap Lkapn Kduz"><path class="hc" d="M'+f(X(x0))+','+f(Y(y+rh))+'L'+f(X(x1))+','+f(Y(y+rh))+'L'+f(X(x2))+','+f(Y(y))+'L'+f(X(x1))+','+f(Y(y-rh))+'L'+f(X(x0))+','+f(Y(y-rh))+'Z"/></g>'; }
   let fp=''; const x0=PT.x0+PT.sLE, cc=PT.c; for(let i=0;i<=40;i++){ const xc=(1-Math.cos(Math.PI*i/40))/2; fp+=(i?'L':'M')+f(X(x0+xc*cc))+','+f(Y(ythk(xc,TC)*cc)); }
   for(let i=40;i>=0;i--){ const xc=(1-Math.cos(Math.PI*i/40))/2; fp+='L'+f(X(x0+xc*cc))+','+f(Y(-ythk(xc,TC)*cc)); }
   o+='<g class="an" data-k="mc mx mCd"><path class="foil" d="'+fp+'Z"/></g>';
@@ -1023,7 +1060,7 @@ function blueprint(){
   o+='<path class="ext" d="'+ext+'"/>';
   /* upper leg chain */
   const yu=Y(ex.y1)-1.6*fs; let extu='';
-  [['gec','Lgec fw fh',g.L_gecis],['fan','Lfan fN fD',g.L_fan],['d3','th3 Lfd',g.L_D3],['ust','Lgec Lfan',g.L_ust]].forEach(([id,kk,L])=>{ const q=B[id]; if(!q||L<0.02) return; const xa=X(q.p[0]), xb=X(q.p[0]-L); o+=dimH(Math.min(xa,xb),Math.max(xa,xb),yu,cmv(L),kk); extu+='M'+f(xa)+','+f(Y(segAt(q,0).y+segAt(q,0).w/2))+'V'+f(yu-6)+'M'+f(xb)+','+f(Y(segAt(q,q.L).y+segAt(q,q.L).w/2))+'V'+f(yu-6); });
+  [['gec','Lgec fD duvar',g.L_gecis],['fan','Lfan fD',g.L_fan],['kap','Lkap kap',g.L_kap],['kapn','Lkapn kap nuk',g.L_kapn],['d3','th3 duvar fD',g.L_D3],['ust','Lgec Lfan',g.L_ust]].forEach(([id,kk,L])=>{ const q=B[id]; if(!q||L<0.02) return; const xa=X(q.p[0]), xb=X(q.p[0]-L); o+=dimH(Math.min(xa,xb),Math.max(xa,xb),yu,cmv(L),kk); extu+='M'+f(xa)+','+f(Y(segAt(q,0).y+segAt(q,0).w/2))+'V'+f(yu-6)+'M'+f(xb)+','+f(Y(segAt(q,q.L).y+segAt(q,q.L).w/2))+'V'+f(yu-6); });
   o+='<path class="ext" d="'+extu+'"/>';
   /* overall + widths */
   const yo=yd+2.8*fs; o+=dimH(X(ex.x0),X(ex.x1),yo,'overall '+cmv(g.boy),'H Ldn Lc LTS');
@@ -1034,7 +1071,7 @@ function blueprint(){
   o+=dimV(X(g.X_alt)-g.s12/2*k-0.9*fs,Y(-g.s12/2),Y(g.s12/2),cmv(g.s12),'s12','end');
   /* flow arrow + title block */
   if(B.ts){ const xa=X(g.s34/2+0.25); o+='<g class="an" data-k="V T p"><path class="dim" d="M'+f(xa)+','+f(Y(g.H/2))+'h'+f(3*fs)+'M'+f(xa+2.6*fs)+','+f(Y(g.H/2)-5)+'l6,5l-6,5"/><text class="dt" x="'+f(xa+3.6*fs)+'" y="'+f(Y(g.H/2)+0.35*fs)+'">V '+nf(P.V,1)+' m/s · '+nf(P.T,1)+' °C</text></g>'; }
-  const rh=2.3*10.5*K, rows=['SMOKELINE · '+S.id,'PLAN · DIMENSIONS IN CM · TRUE SCALE','CR '+nf(P.CR,2)+' · ER '+nf(R.ER,2)+' · '+P.fN+' FANS','Δp '+nf(R.dp_top,0)+' Pa · '+kW(R.P_mil).v+' '+kW(R.P_mil).u+' @ '+nf(P.V,1)+' m/s'];
+  const rh=2.3*10.5*K, rows=['SMOKELINE · '+S.id,'PLAN · DIMENSIONS IN CM · TRUE SCALE','CR '+nf(P.CR,2)+' · ER '+nf(R.ER,2)+' · FAN Ø'+nf(P.fD,0),'Δp '+nf(R.dp_top,0)+' Pa · '+kW(R.P_mil).v+' '+kW(R.P_mil).u+' @ '+nf(P.V,1)+' m/s'];
   const tbw=Math.min(VW-40,36*10.5*K*0.62), tbx=VW-mR-tbw+20, tby=yo+1.6*fs;
   o+='<rect class="tb" x="'+f(tbx)+'" y="'+f(tby)+'" width="'+f(tbw)+'" height="'+f(rh*rows.length)+'"/>';
   rows.forEach((t,i)=>{ if(i) o+='<path class="tb" d="M'+f(tbx)+','+f(tby+rh*i)+'h'+f(tbw)+'"/>'; o+='<text class="ttl" x="'+f(tbx+0.8*10.5*K)+'" y="'+f(tby+rh*i+rh*0.68)+'">'+esc(t)+'</text>'; });
@@ -1052,9 +1089,9 @@ function renderThermal(){
   const parts=[['fan','Fan shaft','k-fan'],['motor','Motor losses','k-model'],['duvar','Walls','k-duct'],['sprey','Spray water','k-hx']];
   const row=(lab,sub,t)=>'<div class="th-row"><div class="l">'+lab+'<small>'+sub+'</small></div><div class="th-st">'+parts.map(p=>'<span title="'+p[1]+' '+kW(t[p[0]]).v+' '+kW(t[p[0]]).u+'" style="width:'+(t[p[0]]/mx*100).toFixed(2)+'%;background:var(--'+p[2]+')"></span>').join('')+
     '<span title="margin" style="width:'+((t.sec-t.top)/mx*100).toFixed(2)+'%;background:repeating-linear-gradient(135deg,var(--line) 0 4px,transparent 4px 8px)"></span></div><div class="v">'+kW(t.sec).v+'<small>'+kW(t.sec).u+'</small></div></div>';
-  $('#ithBars').innerHTML=row('Design',nf(P.V,0)+' m/s · '+nf(P.LWC,1)+' g/m³',TB)+row('Continuous',nf(P.Vs,0)+' m/s · '+nf(P.LWCs,1)+' g/m³',TBs)+
+  $('#ithBars').innerHTML=row('S2 · design',nf(P.V,0)+' m/s · '+nf(P.LWC,1)+' g/m³',TB)+row('S1',nf(P.Vs,0)+' m/s · '+nf(P.LWCs,1)+' g/m³',TBs)+
     '<div class="th-leg">'+parts.map(p=>'<span><i style="background:var(--'+p[2]+')"></i>'+p[1]+' '+kW(TB[p[0]]).v+' '+kW(TB[p[0]]).u+'</span>').join('')+'<span><i style="background:repeating-linear-gradient(135deg,var(--muted) 0 2px,transparent 2px 4px)"></i>Selection margin ×'+nf(P.tmarg,2)+'</span></div>'+
-    '<p class="note" style="margin:12px 0 0">Wall U = '+nf(TB.U,3)+' W/m²K over '+nf(R.A_duvar,1)+' m². Spray water is cooled from '+nf(P.spT,0)+' °C, frozen and sub-cooled to '+nf(P.T,0)+' °C: '+nf(TB.m_su*3600,1)+' kg/h. Air temperature rise through the fans '+nf((TB.fan+TB.motor)/(R.mdot*1005),2)+' K.</p>';
+    '<p class="note" style="margin:12px 0 0">Wall U = '+nf(TB.U,3)+' W/m²K over '+nf(R.A_duvar,1)+' m². Spray water is cooled from '+nf(P.spT,0)+' °C, frozen and sub-cooled to '+nf(P.T,0)+' °C: '+nf(TB.m_su*3600,1)+' kg/h. Air temperature rise through the fan '+nf((TB.fan+TB.motor)/(R.mdot*1005),2)+' K.</p>';
   const kv=(l,v,u)=>'<div><div class="l">'+l+'</div><div class="v">'+v+(u?'<small>'+u+'</small>':'')+'</div></div>';
   $('#iicCard').innerHTML='<h3>Icing cloud at the model<small>Langmuir–Blodgett · Anderson</small></h3><div class="ic-kv">'+
     kv('Spray water',nf(IC.water_Lh,1),'L/h')+kv('Per nozzle',nf(IC.perNoz,2),'L/h')+kv('Stagnation β₀',nf(IC.beta0,2),'')+kv('Modified inertia K₀',nf(IC.K0,2),'')+
@@ -1067,41 +1104,88 @@ function renderThermal(){
 
 /* ================= render: fan ================= */
 function renderFan(){
-  const R=S.R, f=R.fan, G=S.G, fw=G.fan.w, fh=G.fan.h, W=420, sc=(W-80)/Math.max(fw,fh), Hh=fh*sc+70, x0=40+(W-80-fw*sc)/2, y0=26, fx=v=>v.toFixed(1);
-  let o='<rect x="'+fx(x0)+'" y="'+y0+'" width="'+fx(fw*sc)+'" height="'+fx(fh*sc)+'" style="fill:var(--accent);fill-opacity:.05;stroke:var(--ink)" stroke-width="1.4"/>';
-  const cw=fw/f.ncol, ch=fh/f.nrow, spd=clamp(60/Math.max(1,f.n_rpm)*12,0.4,4);
-  let i=0;
-  for(let r=0;r<f.nrow;r++) for(let c=0;c<f.ncol;c++){ if(i>=G.fan.N) break; i++;
-    const cx=x0+(c+0.5)*cw*sc, cy=y0+(r+0.5)*ch*sc, rr=G.fan.D/2*sc, hub=rr*G.fan.nu, ok=f.fits;
-    o+='<rect x="'+fx(x0+c*cw*sc)+'" y="'+fx(y0+r*ch*sc)+'" width="'+fx(cw*sc)+'" height="'+fx(ch*sc)+'" style="fill:none;stroke:var(--line)" stroke-dasharray="3 3"/>';
-    o+='<circle cx="'+fx(cx)+'" cy="'+fx(cy)+'" r="'+fx(rr)+'" style="fill:var(--k-fan);fill-opacity:.08;stroke:'+(ok?'var(--k-fan)':'var(--bad)')+'" stroke-width="1.6"/>';
-    o+='<g class="rot'+((r+c)%2?' ccw':'')+'" style="--spd:'+spd.toFixed(2)+'s">';
-    for(let b=0;b<7;b++){ const a=b/7*Math.PI*2; const p1=[cx+Math.cos(a)*hub,cy+Math.sin(a)*hub], p2=[cx+Math.cos(a+0.35)*rr*0.95,cy+Math.sin(a+0.35)*rr*0.95], p3=[cx+Math.cos(a+0.62)*rr*0.9,cy+Math.sin(a+0.62)*rr*0.9];
-      o+='<path d="M'+fx(p1[0])+','+fx(p1[1])+'Q'+fx(p2[0])+','+fx(p2[1])+' '+fx(p3[0])+','+fx(p3[1])+'" style="stroke:var(--k-fan);fill:none" stroke-width="2.2" stroke-linecap="round"/>'; }
-    o+='</g><circle cx="'+fx(cx)+'" cy="'+fx(cy)+'" r="'+fx(hub)+'" style="fill:var(--surface);stroke:var(--k-fan)" stroke-width="1.2"/>';
-  }
-  o+='<path d="M'+fx(x0)+','+fx(y0+fh*sc+16)+'h'+fx(fw*sc)+'M'+fx(x0)+','+fx(y0+fh*sc+10)+'v12M'+fx(x0+fw*sc)+','+fx(y0+fh*sc+10)+'v12" style="stroke:var(--muted)" fill="none"/><text x="'+fx(x0+fw*sc/2)+'" y="'+fx(y0+fh*sc+32)+'" text-anchor="middle" style="fill:var(--muted);font:500 12px var(--f-mono)">'+nf(P.fw,0)+' cm</text>';
-  o+='<path d="M'+fx(x0-16)+','+fx(y0)+'v'+fx(fh*sc)+'M'+fx(x0-22)+','+fx(y0)+'h12M'+fx(x0-22)+','+fx(y0+fh*sc)+'h12" style="stroke:var(--muted)" fill="none"/><text x="'+fx(x0-26)+'" y="'+fx(y0+fh*sc/2)+'" text-anchor="end" style="fill:var(--muted);font:500 12px var(--f-mono)">'+nf(P.fh,0)+'</text>';
-  o+='<text x="'+fx(x0+fw*sc/2)+'" y="16" text-anchor="middle" style="fill:var(--muted);font:500 11px var(--f-mono)">view from upstream · '+G.fan.N+' × Ø'+nf(P.fD,0)+' cm · counter-rotating pairs</text>';
-  $('#ifanFace').innerHTML='<svg viewBox="0 0 '+W+' '+fx(Hh)+'" role="img" aria-label="Fan array seen from upstream">'+o+'</svg>';
+  const R=S.R, f=R.fan, G=S.G, D=G.fan.D, W=420, sc=(W-110)/D, cx=W/2, cy=40+D*sc/2, Hh=D*sc+96, fx=v=>v.toFixed(1);
+  const rr=D/2*sc, hub=rr*G.fan.nu, hk=rr*G.fan.nuk, spd=clamp(60/Math.max(1,f.n_rpm)*12,0.4,4), nb=7, nv=11;
+  /* round casing, seen from upstream: rotor in front, straightener vanes on the enlarged hub behind it */
+  let o='<circle cx="'+fx(cx)+'" cy="'+fx(cy)+'" r="'+fx(rr+7)+'" style="fill:var(--accent);fill-opacity:.05;stroke:var(--ink)" stroke-width="1.4"/>';
+  o+='<circle cx="'+fx(cx)+'" cy="'+fx(cy)+'" r="'+fx(rr)+'" style="fill:var(--k-fan);fill-opacity:.07;stroke:var(--k-fan)" stroke-width="1.4"/>';
+  if(G.fan.kap){ for(let i=0;i<nv;i++){ const a=i/nv*Math.PI*2-Math.PI/2; o+='<path d="M'+fx(cx+Math.cos(a)*hk)+','+fx(cy+Math.sin(a)*hk)+'L'+fx(cx+Math.cos(a+0.08)*rr)+','+fx(cy+Math.sin(a+0.08)*rr)+'" style="stroke:var(--muted)" stroke-width="1.4" stroke-dasharray="3 2"/>'; }
+    o+='<circle cx="'+fx(cx)+'" cy="'+fx(cy)+'" r="'+fx(hk)+'" style="fill:none;stroke:var(--muted)" stroke-width="1.2" stroke-dasharray="4 3"/>'; }
+  o+='<g class="rot" style="--spd:'+spd.toFixed(2)+'s">';
+  for(let b=0;b<nb;b++){ const a=b/nb*Math.PI*2, p1=[cx+Math.cos(a)*hub,cy+Math.sin(a)*hub], p2=[cx+Math.cos(a+0.3)*rr*0.95,cy+Math.sin(a+0.3)*rr*0.95], p3=[cx+Math.cos(a+0.5)*rr*0.93,cy+Math.sin(a+0.5)*rr*0.93];
+    o+='<path d="M'+fx(p1[0])+','+fx(p1[1])+'Q'+fx(p2[0])+','+fx(p2[1])+' '+fx(p3[0])+','+fx(p3[1])+'" style="stroke:var(--k-fan);fill:none" stroke-width="3" stroke-linecap="round"/>'; }
+  o+='</g><circle cx="'+fx(cx)+'" cy="'+fx(cy)+'" r="'+fx(hub)+'" style="fill:var(--surface);stroke:var(--k-fan)" stroke-width="1.4"/>';
+  const yb=cy+rr+22;
+  o+='<path d="M'+fx(cx-rr)+','+fx(yb)+'h'+fx(2*rr)+'M'+fx(cx-rr)+','+fx(yb-6)+'v12M'+fx(cx+rr)+','+fx(yb-6)+'v12" style="stroke:var(--muted)" fill="none"/><text x="'+fx(cx)+'" y="'+fx(yb+18)+'" text-anchor="middle" style="fill:var(--muted);font:500 12px var(--f-mono)">Ø '+nf(P.fD,0)+' cm</text>';
+  o+='<text x="'+fx(cx)+'" y="18" text-anchor="middle" style="fill:var(--muted);font:500 11px var(--f-mono)">view from upstream · rotor hub '+nf(G.fan.nu,2)+' D'+(G.fan.kap?' · straightener on '+nf(G.fan.nuk,2)+' D hub':'')+'</text>';
+  $('#ifanFace').innerHTML='<svg viewBox="0 0 '+W+' '+fx(Hh)+'" role="img" aria-label="Single axial fan seen from upstream">'+o+'</svg>';
   const t=(l,v,u,hl)=>'<div'+(hl?' class="hl"':'')+'><div class="l">'+l+'</div><div class="v">'+v+'<small>'+u+'</small></div></div>';
-  $('#ifanTiles2').innerHTML=t('Per fan, flow',ni(3600*f.q_tek),'m³/h',true)+t(P.fveri==='statik'?'Static rise needed':'Total rise needed',ni(R.dp_top*P.marg),'Pa · ×'+nf(P.marg,2),true)+
-    t('Shaft per fan',kW(R.P_mil*P.marg/G.fan.N).v,kW(R.P_mil*P.marg/G.fan.N).u+' with margin')+t('Estimated speed',ni(f.n_rpm),'rpm')+
-    t('Tip speed',nf(f.U_uc,1),'m/s · M '+nf(f.M_uc,2))+t('Flow coefficient φ',nf(f.phi,2),'c_ax/U')+t('Outlet velocity',nf(f.V_cikis,1),'m/s')+t('Outlet coverage',nf(f.oran*100,0),'% of section');
+  $('#ifanTiles2').innerHTML=t('Flow',ni(3600*R.Q),'m³/h · '+nf(R.Q,2)+' m³/s',true)+t('Total rise, clean',ni(R.dp_top),'Pa · selection ×'+nf(P.marg,2)+' '+ni(R.dp_top*P.marg),true)+
+    t('Total rise, iced (λ_fan '+nf(P.lamF,2)+')',ni(R.dp_top*P.lamF),'Pa')+t('Shaft, clean / iced',nf(R.P_mil/1000,1)+' / '+nf(R.P_mil*P.lamF/1000,1),'kW · η '+nf(P.etaf,2))+
+    t('Estimated speed',ni(f.n_rpm),'rpm · ψ '+nf(P.psi,2))+t('Tip speed',nf(f.U_uc,1),'m/s · M '+nf(f.M_uc,2))+
+    t('Fan section velocity',nf(f.V_sec,1),'m/s'+(isFinite(f.V_an)?' · '+nf(f.V_an,1)+' in the annulus':''))+t('Flow coefficient φ',nf(f.phi,2),'c_ax/U');
+  /* fan_gereksinim: brand-independent requirement for both scenarios */
+  const FR=S.FR, col=(lab,fn,u)=>'<tr><td>'+lab+(u?'<small>'+u+'</small>':'')+'</td>'+FR.map(r=>'<td>'+fn(r)+'</td>').join('')+'</tr>';
+  $('#ifanReq').innerHTML='<h3>Fan requirement (brand-independent)</h3><p class="ops-sub">What a vendor needs, for both scenarios. The fan covers both points on one inverter; the larger one decides. η_fan = '+nf(P.etaf,2)+' is an estimate until a fan is chosen.</p>'+
+    '<div class="tscroll"><table class="stab mini"><thead><tr><th></th>'+FR.map(r=>'<th>'+esc(r.name)+'</th>').join('')+'</tr></thead><tbody>'+
+    col('Air temperature / density',r=>nf(r.Tc,0)+' °C / '+nf(r.rho,3),'kg/m³')+col('Flow',r=>ni(r.Q*3600)+' m³/h','')+
+    col('Total pressure rise, clean',r=>ni(r.dp0)+' Pa','incl. leakage, model')+col('Total pressure rise, iced',r=>'<b>'+ni(r.dpL)+' Pa</b>','λ_fan '+nf(P.lamF,2))+
+    col('Shaft power, clean / iced',r=>nf(r.Pm0/1000,1)+' / '+nf(r.PmL/1000,1)+' kW','')+col('Suggested motor',r=>nf(r.motor/1000,1)+' kW','1.15 × iced shaft')+
+    col('Electrical, iced',r=>nf(r.PeL/1000,1)+' kW','η_m '+nf(P.etam,2))+col('Velocity in the fan section',r=>nf(r.Vfan,1)+' m/s','')+col('Power factor P_shaft/P_jet',r=>nf(r.pf,2),'iced')+'</tbody></table></div>';
   renderFanCurve();
 }
 function renderFanCurve(){
   const R=S.R, FC=S.FC, box=$('#fcChart'), out=$('#fcOut');
   const k=R.dp_top/(R.Q*R.Q), qmax=FC?Math.max(...FC.Q)*1.05:R.Q*1.6, xs=[]; for(let i=0;i<=60;i++) xs.push(qmax*i/60);
-  const series=[{xs,ys:xs.map(q=>k*q*q),color:'var(--ink)',w:2,name:'system Δp = kQ²'},{xs,ys:xs.map(q=>k*q*q*P.marg),color:'var(--muted)',w:1.2,dash:'4 3',name:'×'+nf(P.marg,2)+' selection'}];
-  if(FC) series.push({xs:FC.Q.filter((_,i)=>i%20===0),ys:FC.dp.filter((_,i)=>i%20===0),color:'var(--k-fan)',w:2.4,name:P.fN+' × '+(P.fcname||'fan')});
+  const series=[{xs,ys:xs.map(q=>k*q*q),color:'var(--ink)',w:2,name:'system Δp = kQ²'},{xs,ys:xs.map(q=>k*q*q*P.lamF),color:'var(--muted)',w:1.2,dash:'4 3',name:'iced, ×'+nf(P.lamF,2)+' (λ_fan)'}];
+  if(FC) series.push({xs:FC.Q.filter((_,i)=>i%20===0),ys:FC.dp.filter((_,i)=>i%20===0),color:'var(--k-fan)',w:2.4,name:P.fcname||'fan'});
   const marks=[{x:R.Q,y:R.dp_top,c:'var(--accent)',l:'design',end:true}];
   if(FC) marks.push({x:FC.Q_cn,y:FC.dp_cn,c:'var(--k-fan)',l:'operating point'});
   lineChart(box,{series,marks,xl:'Q [m³/s]',yl:'Δp [Pa]',h:260});
-  if(!FC){ out.innerHTML='<p class="note">Paste a manufacturer curve (per fan, Q in m³/h and static Δp in Pa, same number of points) to find the operating point of the '+P.fN+' fans in parallel on this circuit.</p>'; return; }
+  if(!FC){ out.innerHTML='<p class="note">Paste a manufacturer curve at full speed (Q in m³/h and total pressure Δp in Pa, same number of points) to find where it meets this circuit. It is scaled from its own density to '+nf(R.rho,3)+' kg/m³.</p>'; return; }
   const ok=FC.V_cn>=R.V;
-  out.innerHTML='<p style="margin:0 0 6px"><b style="color:var(--'+(ok?'ok':'warn')+')">'+nf(FC.V_cn,1)+' m/s</b> reachable at full speed (target '+nf(R.V,0)+' m/s): '+ni(FC.q_fan)+' m³/h per fan, total '+nf(FC.Q_cn,2)+' m³/s at '+nf(FC.dp_cn,0)+' Pa (curve scaled to '+nf(R.rho,3)+' kg/m³).</p>'+
-    '<p class="note" style="margin:0">'+(FC.maxdp<FC.need?'This fan cannot deliver the '+ni(FC.need)+' Pa selection pressure at all (max '+ni(FC.maxdp)+' Pa).':'At the selection pressure '+ni(FC.need)+' Pa one fan gives '+ni(FC.q_need)+' m³/h, so the target flow needs '+nf(FC.nEq,2)+' fan equivalents ('+P.fN+' installed).')+'</p>';
+  out.innerHTML='<p style="margin:0 0 6px"><b style="color:var(--'+(ok?'ok':'warn')+')">'+nf(FC.V_cn,1)+' m/s</b> reachable at full speed (target '+nf(R.V,0)+' m/s): '+nf(FC.Q_cn,2)+' m³/s at '+nf(FC.dp_cn,0)+' Pa (curve scaled to '+nf(R.rho,3)+' kg/m³).</p>'+
+    '<p class="note" style="margin:0">'+(FC.maxdp<FC.need?'This fan cannot deliver the '+ni(FC.need)+' Pa selection pressure at all (max '+ni(FC.maxdp)+' Pa).':'At the selection pressure '+ni(FC.need)+' Pa it gives '+ni(FC.q_need)+' m³/h, i.e. '+nf(FC.nEq,2)+' fans of this size would be needed for the target flow.')+'</p>';
+}
+
+/* ================= render: icing scenarios + operating cycle (kapali_devre_1D.m §10) ================= */
+function renderOps(){
+  const SN=S.SN, ICE=S.ICE, O=S.OPS, G=S.G, lf=P.lamF, mn=s=>isFinite(s)?nf(s/60,s<600?1:0):'—';
+  const kv=(l,v,u,hl)=>'<div'+(hl?' class="hl"':'')+'><div class="l">'+l+'</div><div class="v">'+v+(u?'<small>'+u+'</small>':'')+'</div></div>';
+  const j2=SN.length-1, coolS=O.cool[j2].find(c=>Math.abs(c.Qk-O.Qk)<1), r1=O.run[j2].find(r=>r.LWC===1)||O.run[j2][0], cy=O.cyc[j2].find(r=>r.LWC===1)||O.cyc[j2][0];
+  $('#iopsKpi').innerHTML=kv('Thermal mass C',nf(O.C/1e6,2),'MJ/K · UA '+nf(O.UA,0)+' W/K',true)+kv('Cool-down to '+nf(P.T,0)+' °C',coolS&&coolS.ok?mn(coolS.t):'not reached','min at '+nf(O.Qk/1000,0)+' kW',true)+
+    kv('Run at 1 g/m³ ('+SN[j2].id+')',mn(r1.nom.t)+' / '+mn(r1.worst.t),'min nominal / worst')+kv('Runs per '+nf(P.tday,0)+' h day',cy.nA+' / '+cy.nB,'A full de-ice / B coil defrost');
+  /* iced loss coefficients */
+  const mxL=Math.max(lf,...ICE.flat().map(x=>x.lam));
+  let h='<thead><tr><th>State</th>'+SN.map(s=>'<th>K '+s.id+'</th><th>Δp [Pa]</th><th>λ</th><th>Shaft [kW]</th>').join('')+'<th>vs λ_fan</th></tr></thead><tbody>';
+  ICE[0].forEach((row,i)=>{ const ok=ICE.every(L=>L[i].ok);
+    h+='<tr><td>'+esc(row.name)+(row.refs.length?'<small>['+row.refs.join('][')+']</small>':'')+'</td>'+ICE.map(L=>{ const x=L[i]; return '<td>'+nf(x.K,4)+'</td><td>'+ni(x.dp)+'</td><td>'+nf(x.lam,2)+'<span class="lamb" style="width:'+(x.lam/mxL*40).toFixed(1)+'px;background:var(--'+(x.ok?'k-fan':'bad')+')"></span></td><td>'+nf(x.P/1000,1)+'</td>'; }).join('')+
+      '<td class="'+(ok?'ok':'bad')+'">'+(ok?'inside':'exceeds')+'</td></tr>'; });
+  $('#iopsIce').innerHTML=h+'</tbody>';
+  /* λ(t) at 1 g/m³ and cool-down curves */
+  const ser=[], cols=['var(--k-set)','var(--k-fan)'];
+  O.run.forEach((L,j)=>{ const r=L.find(x=>x.LWC===1)||L[0];
+    ser.push({xs:r.nom.ts.map(t=>t/60),ys:r.nom.lams,color:cols[j%2],w:2.2,name:SN[j].id+' nominal'});
+    ser.push({xs:r.worst.ts.map(t=>t/60),ys:r.worst.lams,color:cols[j%2],w:1.4,dash:'4 3',name:SN[j].id+' worst'}); });
+  const tmx=Math.max(...ser.map(s=>Math.max(...s.xs)));
+  ser.push({xs:[0,tmx],ys:[lf,lf],color:'var(--bad)',w:1,dash:'2 3',name:'λ_fan'});
+  lineChart($('#iopsLam .ch'),{series:ser,xl:'spray time [min]',h:240,aria:'Circuit loss ratio during a run at 1 g/m³',
+    tip:xv=>{ const rows=O.run.map((L,j)=>{ const r=L.find(x=>x.LWC===1)||L[0], kf=r.nom.Kf(xv*60), kw=r.worst.Kf(xv*60); return '<div class="num"><span>'+SN[j].id+'</span><span>'+(isFinite(kf)?nf(kf/r.nom.K0,2):'—')+' / '+(isFinite(kw)?nf(kw/r.worst.K0,2):'—')+'</span></div>'; }).join('');
+      return {x:xv,h:'<b>t = '+nf(xv,0)+' min</b><div class="num"><span></span><span>λ nominal / worst</span></div>'+rows}; }});
+  const cs=O.cool[j2].map((c,i)=>({xs:c.te.map(t=>t/60),ys:c.Te.map(T=>Math.max(0,T-P.T)),color:['var(--muted)','var(--k-hx)','var(--ink)'][i],w:i===1?2.4:1.4,dash:i===1?null:'4 3',name:nf(c.Qk/1000,0)+' kW'+(c.ok?'':' (not reached)')}));
+  lineChart($('#iopsCool .ch'),{series:cs,xl:'time [min]',h:240,aria:'Initial cool-down, air temperature above target'});
+  /* run time and cycle tables */
+  const lim=w=>esc(E.WHY[w]||w);
+  let r='<thead><tr><th>LWC [g/m³]</th>'+SN.map(s=>'<th>'+s.id+' nominal [min]</th><th>ends on</th><th>'+s.id+' worst [min]</th><th>ends on</th>').join('')+'</tr></thead><tbody>';
+  G.ops.LWC.forEach((L,i)=>{ r+='<tr'+(Math.abs(L-P.LWC)<1e-9?' class="is-now"':'')+'><td>'+nf(L,2)+'</td>'+O.run.map(Lj=>{ const x=Lj[i]; return '<td>'+mn(x.nom.t)+'</td><td>'+lim(x.nom.why)+'</td><td>'+mn(x.worst.t)+'</td><td>'+lim(x.worst.why)+'</td>'; }).join('')+'</tr>'; });
+  $('#iopsRun').innerHTML=r+'</tbody>';
+  let c='<thead><tr><th>Scenario · LWC</th><th>Spray [min]</th><th>Water [kg]</th><th>A de-ice</th><th>A drain</th><th>A re-cool</th><th>A total</th><th>B defrost</th><th>B drain</th><th>B re-cool</th><th>B total</th><th>Runs/day A · B</th></tr></thead><tbody>';
+  O.cyc.forEach((L,j)=>{ c+='<tr class="grp-h"><td colspan="12">'+esc(SN[j].name)+' · first cool-down '+(L[0].ilkOk?mn(L[0].ilk)+' min':'not reached')+'</td></tr>';
+    L.forEach(x=>{ c+='<tr><td>'+nf(x.LWC,2)+' g/m³</td><td>'+mn(x.tsp)+'</td><td>'+nf(x.m_su,1)+'</td><td>'+mn(x.A.coz)+'</td><td>'+mn(x.A.dren)+'</td><td>'+mn(x.A.sog)+'</td><td><b>'+(isFinite(x.A.tot)?nf(x.A.tot,0):'—')+'</b></td><td>'+mn(x.B.coz)+'</td><td>'+mn(x.B.dren)+'</td><td>'+mn(x.B.sog)+'</td><td><b>'+(isFinite(x.B.tot)?nf(x.B.tot,0):'—')+'</b></td><td>'+x.nA+' · '+x.nB+'</td></tr>'; }); });
+  $('#iopsCyc').innerHTML=c+'</tbody>';
+  $('#iopsNote').innerHTML='Thermal mass (estimates, linear in C): inner shell '+nf(O.Cb.shell/1e6,2)+', insulation '+nf(O.Cb.ins/1e6,2)+', coil + fluid '+nf(O.Cb.hx/1e6,2)+', internals '+nf(O.Cb.inner/1e6,2)+', air '+nf(O.Cb.air/1e6,3)+' MJ/K. '+
+    'A spray run is taken as min(nominal run, 10 min). A warms the whole tunnel to +5 °C with a '+nf(P.Pis,0)+' kW heater and the fan at 15 m/s; B defrosts only the coil ('+nf(P.Pdef,0)+' kW, 60% into the coil), so corner and wall ice stays and consecutive runs are limited. '+
+    'Lumped model: coil UA, ice on the coil reducing heat transfer and the lag between wall and air are not modelled. Replace the masses and the refrigeration curve with vendor data.';
 }
 function lineChart(box,cfg){
   const W=Math.max(280,box.clientWidth||600), H=cfg.h||250, m={l:52,r:14,t:12,b:38}, iw=W-m.l-m.r, ih=H-m.t-m.b;
@@ -1205,7 +1289,7 @@ function openAudit(id){
 }
 
 /* ================= chapters, rail, transitions ================= */
-const CH=[{id:'itop',name:'Circuit'},{id:'izoom',name:'Icing close-up'},{id:'iaudit',name:'Design audit'},{id:'iloss',name:'Loss loop'},{id:'igeo',name:'Geometry'},{id:'itherm',name:'Thermal & icing'},{id:'ifan',name:'Fan array'},{id:'isweep',name:'Speed sweep'},{id:'isheet',name:'Datasheet'}];
+const CH=[{id:'itop',name:'Circuit'},{id:'izoom',name:'Icing close-up'},{id:'iaudit',name:'Design audit'},{id:'iloss',name:'Loss loop'},{id:'igeo',name:'Geometry'},{id:'itherm',name:'Thermal & icing'},{id:'iops',name:'Operating cycle'},{id:'ifan',name:'Fan'},{id:'isweep',name:'Speed sweep'},{id:'isheet',name:'Datasheet'}];
 const PAL={bg:'#03080C',a:'#2C7FAE',b:'#E9FCFF'};
 function ctrans(name,eyebrow,action){ if(window.SL&&SL.gust) SL.gust(name,eyebrow,action,PAL); else action(); }
 function railH(){ return $('#irail').offsetHeight||50; }
@@ -1256,11 +1340,11 @@ function update(fromEdit){
   eh.innerHTML=''; save();
   S=compute();
   if(window.SL_sound) SL_sound.set('closed',{V:S.R.V,shaft:S.R.fan.n_rpm/60,fans:S.G.fan.N,spray:S.G.LWC});
-  const gk=JSON.stringify(FIELDS.filter(f=>!['V','T','p','LWC','MVD','Tlab','RH','etaf','etam','marg','tmarg','Vs','LWCs','leak','psi','nu','fK','mCd','hxdp','hxV','hxn','hxf','elK','spCd','spT','ik','ihi','iho','buz1','fveri'].includes(f.k)).map(f=>P[f.k]));
+  const gk=JSON.stringify(FIELDS.filter(f=>!['V','T','p','LWC','MVD','Tlab','RH','etaf','etam','marg','tmarg','Vs','LWCs','leak','psi','nu','fK','Kduz','mCd','mB','hxdp','hxV','hxn','hxf','elK','spCd','spT','ik','ihi','iho','buz1','duvar'].includes(f.k)&&f.g!=='ice'&&f.g!=='ops').map(f=>P[f.k]));
   if(gk!==update.gk){ update.gk=gk; PT=buildPath(S.R,S.G); LANES=buildLanes(PT,24); [HV,ZV].forEach(v=>{ if(v.gl) v.gl.upload(LANES); }); layoutHero(); layoutZoom(); buildRail(); drops=[]; }
   else { drawBase(HV); drawFallback(HV); }
   renderHero(); renderZoomCards(); renderAudit(); flagFields(); diffAudit(fromEdit);
-  clearTimeout(slowT); slowT=setTimeout(()=>{ renderLoss(); blueprint(); renderThermal(); renderFan(); renderSweep(); renderSheet(); },110);
+  clearTimeout(slowT); slowT=setTimeout(()=>{ renderLoss(); blueprint(); renderThermal(); renderOps(); renderFan(); renderSweep(); renderSheet(); },110);
   lastScroll=-1;
 }
 
@@ -1299,8 +1383,9 @@ $('#ibtnTsv').addEventListener('click',()=>copyText(TSV.join('\n'),$('#itsvStatu
 $('#dsExport').addEventListener('click',exportPDF);
 ['dsName','dsBy','dsRev','dsOrg'].forEach(id=>$('#'+id).addEventListener('input',()=>{ if(S) renderSheet(); try{ localStorage.setItem('smokeline.icing.sheet',JSON.stringify(['dsName','dsBy','dsOrg','dsRev','dsNotes'].map(i=>$('#'+i).value))); }catch(_){} }));
 try{ const v=JSON.parse(localStorage.getItem('smokeline.icing.sheet')||'null'); if(Array.isArray(v)) ['dsName','dsBy','dsOrg','dsRev','dsNotes'].forEach((i,k)=>{ if(v[k]) $('#'+i).value=v[k]; }); }catch(_){}
-['fcQ','fcdp','fcrho','fcname'].forEach(k=>$('#'+k).addEventListener('input',e=>{ P[k]=k==='fcrho'?(parseNum(e.target.value)||1.394):e.target.value; schedule(false); }));
-$('#fcEx').addEventListener('click',()=>{ P.fcQ='0 982 2371 4170 6050 7740 9134 10299 11319 12248 13130'; P.fcdp='1507 1323 1171 1077 1001 887 735 563 380 193 0'; P.fcrho=1.394; P.fcname='candidate curve'; syncInputs(); schedule(false); });
+['fcQ','fcdp','fcrho','fcname'].forEach(k=>$('#'+k).addEventListener('input',e=>{ P[k]=k==='fcrho'?(parseNum(e.target.value)||1.204):e.target.value; schedule(false); }));
+/* example: BVN BTFM 1000 at 50 Hz, total pressure (catalogue static + ½ρ(Q/πR²)²), 1.204 kg/m³ — the v1.4 comparison fan */
+$('#fcEx').addEventListener('click',()=>{ P.fcQ='31750 34958 38181 41389 43000 46208 49431 52639 55847'; P.fcdp='747 731 732 729 719 681 608 505 379'; P.fcrho=1.204; P.fcname='BVN BTFM 1000 (50 Hz)'; syncInputs(); schedule(false); });
 /* hero hover: tooltip + probe cursor via the shared cursor */
 function heroMove(e){
   const tip=$('#itTip'); if(!S||!HV||e.target!==HV.cvT){ tip.hidden=true; if(HV&&HV.hot){ HV.hot=null; } return; }

@@ -1,8 +1,15 @@
 /* Smokeline · closed-circuit icing wind tunnel · 1D engine
-   Port of kapali_devre_1D.m v1.3 (K. Yılmaz, 2026-10-27): component loss coefficients referred to the
-   test-section dynamic pressure, fan power, fan-array sizing and thermal budget. On top of that: icing-cloud
-   parameters (Langmuir & Blodgett / Anderson), and the literature design audit shown on the page and in the PDF.
-   Lengths are SI (m) inside this file; the page converts its cm / mm inputs before calling in. */
+   Port of kapali_devre_1D.m v1.6 (K. Yılmaz, 2026-11-06): component loss coefficients referred to the
+   test-section dynamic pressure, fan power and thermal budget, with
+   · v1.5: equivalent cone angle tan θe = (√A2 − √A1)/(√π L) [B p.75/80, E p.xi] for every diffuser,
+     shape-dependent K_e (square, round, square↔round), local flat-wall and diagonal angles of the
+     square↔round fan transitions, Barlow Fig. 3.9 check of the wide-angle diffuser, Barlow p.101 model allowance;
+   · v1.4b: single round fan with hub fairing + straightener and hub closure cone;
+   · v1.6: two scenarios (S1, S2), iced loss coefficients from literature factors, brand-independent fan
+     requirement with an icing margin λ_fan, and the operating cycle (lumped thermal mass: cool-down, run time,
+     de-icing, drain, daily test count).
+   On top of that: icing-cloud parameters (Langmuir & Blodgett / Anderson), and the literature design audit shown
+   on the page and in the PDF. Lengths are SI (m) inside this file; the page converts its cm / mm inputs. */
 (function(){
 'use strict';
 const D2R=Math.PI/180, tand=d=>Math.tan(d*D2R), atand=x=>Math.atan(x)/D2R;
@@ -18,7 +25,9 @@ const REFS={
   LB: {k:'LB', t:'Langmuir, I., Blodgett, K. B. (1946). A mathematical investigation of water droplet trajectories. AAF Tech. Rep. 5418.'},
   AN: {k:'AN', t:'Anderson, D. N. (2004). Manual of Scaling Methods. NASA/CR-2004-212875.'},
   FAA:{k:'FAA',t:'14 CFR Part 25, Appendix C (continuous/intermittent maximum icing) and Appendix O (supercooled large drops).'},
-  MG: {k:'MG', t:'Alduchov, O. A., Eskridge, R. E. (1996). Improved Magnus form approximation of saturation vapor pressure. J. Appl. Meteor. 35, 601–609.'}
+  MG: {k:'MG', t:'Alduchov, O. A., Eskridge, R. E. (1996). Improved Magnus form approximation of saturation vapor pressure. J. Appl. Meteor. 35, 601–609.'},
+  NA2:{k:'NA2',t:'Olsen, W., Van Fossen, J., Nussle, R. (1987). Heat exchanger performance in the NASA Icing Research Tunnel under icing. NASA TM-100116.'},
+  NO: {k:'NO', t:'Newton, J. E., Olsen, W. (1986). Study of ice accretion on icing wind tunnel components. NASA TM-87095.'}
 };
 
 /* ---------------- air ---------------- */
@@ -40,22 +49,47 @@ function KeKare(p){
   if(p<=10) return 1.22156e-1-2.29480e-2*p+5.50704e-3*p*p-4.08644e-4*p**3-3.84056e-5*p**4+8.74969e-6*p**5-3.65217e-7*p**6;
   return -1.321685e-1+2.93315e-2*p;
 }
-const perim=A=>4*Math.sqrt(A);
+/* Ke_sekil: square ↔ round transitions change both sides at once, [E] B14 with δs = 1 -> mean of the two */
+function KeSekil(p,sekil){ return sekil==='daire'?KeDaire(p):sekil==='gecis'?0.5*(KeKare(p)+KeDaire(p)):KeKare(p); }
+/* cevre_hesap: wetted perimeter (transitions taken as square, enough for the wall area) */
+const perim=(A,sekil)=>sekil==='daire'?Math.PI*Math.sqrt(4*A/Math.PI):4*Math.sqrt(A);
+const SQPI=Math.sqrt(Math.PI);
+/* sekil39_ARmax: Barlow Fig. 3.9 upper chart (Mehta & Bradshaw 1979), largest area ratio of a wide-angle
+   diffuser with n elements (screens) for steady attached flow; digitised from the page, ±0.05. */
+const F39X=[16,18,20,22,25,28,30,32,35,38,40,42,45,50,55,65,70];
+const F39=[[3.87,2.63,2.19,1.91,1.62,1.41,1.31,1.23,1.14,1.11,1.10,1.10,1.10,1.10,1.10,1.10,1.10],
+  [7.0,7.0,7.0,6.06,4.80,3.60,3.12,2.84,2.53,2.32,2.21,2.13,2.04,2.00,2.00,2.00,2.00],
+  [7.0,7.0,7.0,7.0,7.0,7.0,7.0,7.0,7.0,6.21,5.44,4.69,4.05,3.51,3.19,2.91,2.90],
+  [7.0,7.0,7.0,7.0,7.0,7.0,7.0,7.0,7.0,7.0,7.0,6.22,5.22,4.19,3.72,3.29,3.25]];
+function fig39(n,th2){
+  const E=F39[Math.min(Math.max(Math.round(n),0),3)], t=Math.min(Math.max(th2,F39X[0]),F39X[F39X.length-1]);
+  let i=0; while(i<F39X.length-2&&t>F39X[i+1]) i++;
+  return E[i]+(E[i+1]-E[i])*(t-F39X[i])/(F39X[i+1]-F39X[i]);
+}
 function trapz(x,y){ let s=0; for(let i=1;i<x.length;i++) s+=(x[i]-x[i-1])*(y[i]+y[i-1])/2; return s; }
 
 /* ---------------- circuit (devre_hesapla) ---------------- */
-function comp(id,name,key,tip,A1,A2,Dh1,Dh2,L){ return {id,name,key,tip,A1,A2,Dh1,Dh2,L,par:{},A_q:A1,V:NaN,q:NaN,Re:NaN,K_lok:0,K_ref:0,dp:0}; }
+function comp(id,name,key,tip,A1,A2,Dh1,Dh2,L,sekil){ return {id,name,key,tip,A1,A2,Dh1,Dh2,L,sekil:sekil||'kare',par:{},A_q:A1,V:NaN,q:NaN,Re:NaN,K_lok:0,K_ref:0,dp:0}; }
 function circuit(G,V,yer,h){
   const rho=h.rho, mu=h.mu, a=G.a, A_TS=a*a, Dh_TS=a, Q=V*A_TS, q_TS=0.5*rho*V*V;
   const s_dn=a*Math.sqrt(G.CR), F=G.fan;
+  /* fan section: one round fan of diameter D, carried as the square of equal area (G.fan.w = G.fan.h) */
   const A_fan=F.w*F.h, Dh_fan=2*F.w*F.h/(F.w+F.h), A_fanlar=F.N*Math.PI*F.D*F.D/4;
-  const AR1=G.s12*G.s12/A_TS, L_D1=0.5*(Math.sqrt(AR1)-1)*Dh_TS/tand(G.th1);
+  /* lengths from the equivalent cone angle, tan θe = (√A2 − √A1)/(√π L)  [B p.75/80, E p.xi] */
+  const AR1=G.s12*G.s12/A_TS, L_D1=(G.s12-a)/(SQPI*tand(G.th1));
   const AR3=G.s34*G.s34/A_fan;
-  const L_D3=AR3>1.02?0.5*(Math.sqrt(AR3)-1)*Dh_fan/tand(G.th3):G.L_fd;
-  const L_GAD=(s_dn-G.s34)/2/tand(G.gad2th/2);
+  let L_D3=0, L_D3_es=0, L_D3_kos=0;
+  if(AR3>1.02){
+    L_D3_es=(G.s34-Math.sqrt(A_fan))/(SQPI*tand(G.th3));
+    /* round (D) -> square (s34): along the diagonal the radius grows D/2 -> s34/√2; keep that wall ≤ duvar_max */
+    L_D3_kos=Math.max(G.s34/Math.SQRT2-F.D/2,G.s34/2-F.D/2)/tand(G.duvar);
+    L_D3=Math.max(L_D3_es,L_D3_kos);
+  }
+  const L_GAD=(s_dn-G.s34)/(SQPI*tand(G.gad2th/2));
   const L_C12=G.H-G.s12, L_C34=G.H-G.s34;
+  const L_kap=F.kap?F.L_kap:0, L_kapn=F.kap?F.L_kapn:0;
   const X=G.s34/2+L_GAD+G.L_dn+G.L_c+G.L_TS+L_D1+G.s12/2;
-  const L_ust_raw=X-(G.s12/2+G.L_gecis+G.L_fan+L_D3+G.s34/2), L_ust=Math.max(0,L_ust_raw);
+  const L_ust_raw=X-(G.s12/2+G.L_gecis+G.L_fan+L_kap+L_kapn+L_D3+G.s34/2), L_ust=Math.max(0,L_ust_raw);
   const gap=G.H-s_dn/2-Math.max(G.s34,F.w)/2-2*G.ins.t;
 
   const B=[], add=(...x)=>{ const c=comp(...x); B.push(c); return c; };
@@ -67,10 +101,16 @@ function circuit(G,V,yer,h){
   add('l12','Duct, corner 1–2','duct','sabit',G.s12**2,G.s12**2,G.s12,G.s12,L_C12);
   if(G.safety){ c=add('safe','Safety screen','set','elek',G.s12**2,G.s12**2,G.s12,G.s12,0); c.par={N:1,dw:1.5e-3,wm:12e-3,Kmesh:1.3}; }
   c=add('c2','Corner 2','corner','kose',G.s12**2,G.s12**2,G.s12,G.s12,G.s12); c.par.buz=1;
-  c=add('gec','Fan transition','diff','gecis',G.s12**2,A_fan,G.s12,Dh_fan,G.L_gecis); c.lim=3.5;
-  c=add('fan','Fan section ('+F.N+' fans, mounting)','fan','fan',A_fan,A_fan,Dh_fan,Dh_fan,G.L_fan); c.par.K=F.K;
-  if(F.veri==='toplam'){ c=add('borda','Fan exit sudden expansion','fan','borda',A_fan,A_fan,Dh_fan,Dh_fan,0); c.par.Af=A_fanlar; }
-  if(!(Math.abs(AR3-1)<0.02&&L_D3===0)){ c=add('d3',AR3>1.02?'Return diffuser':'Post-fan contraction','diff','difuzor',A_fan,G.s34**2,Dh_fan,G.s34,L_D3); c.lim=3.5; }
+  c=add('gec','Fan transition (square → round)','diff','gecis',G.s12**2,A_fan,G.s12,Dh_fan,G.L_gecis,'gecis'); c.lim=3.5;
+  c=add('fan','Fan section (single fan, mounting)','fan','fan',A_fan,A_fan,Dh_fan,Dh_fan,G.L_fan); c.par.K=F.K;
+  if(F.kap){
+    const A_an=A_fan*(1-F.nuk*F.nuk), Dh_an=F.D*(1-F.nuk);
+    c=add('kap','Hub fairing + straightener','fan','fan',A_an,A_an,Dh_an,Dh_an,F.L_kap,'daire'); c.par.K=F.Kduz; c.par.A_an=A_an;
+    c=add('kapn','Hub closure cone','fan','difuzor',A_an,A_fan,Math.sqrt(4*A_an/Math.PI),F.D,F.L_kapn,'daire'); c.lim=5.0;
+  }
+  /* fan exit sudden expansion (Borda–Carnot) vanishes: one fan fills its own round duct (A_fanlar = A_fan) */
+  if(Math.abs(A_fanlar/A_fan-1)>0.02){ c=add('borda','Fan exit sudden expansion','fan','borda',A_fan,A_fan,Dh_fan,Dh_fan,0); c.par.Af=A_fanlar; }
+  if(!(Math.abs(AR3-1)<0.02&&L_D3===0)){ c=add('d3',AR3>1.02?'Return diffuser (round → square)':'Post-fan contraction','diff','difuzor',A_fan,G.s34**2,Dh_fan,G.s34,L_D3,'gecis'); c.lim=3.5; }
   add('ust','Upper return duct','duct','sabit',G.s34**2,G.s34**2,G.s34,G.s34,L_ust);
   c=add('c3','Corner 3','corner','kose',G.s34**2,G.s34**2,G.s34,G.s34,G.s34); c.par.buz=1;
   add('l34','Duct, corner 3–4','duct','sabit',G.s34**2,G.s34**2,G.s34,G.s34,L_C34);
@@ -95,15 +135,19 @@ function circuit(G,V,yer,h){
     b.V=V1; b.q=q1; b.Re=Re1; b.A_q=b.A1;
     switch(b.tip){
       case 'sabit': b.K_lok=fPr(Re1)*b.L/b.Dh1; break;
-      case 'model': b.K_lok=b.par.Cd*b.par.S/b.A1; break;
+      case 'model': {
+        const K2=b.par.Cd*b.par.S/b.A1; b.par.K_2D=K2; b.K_lok=K2;
+        if(G.mdl.barlow){ /* [B] p.101 model allowance: span 0.8 × tunnel, AR 5, C_D 1.0 */
+          const bB=0.8*Math.sqrt(b.A1), KB=1.0*(bB*bB/5)/b.A1; b.par.K_B=KB; b.K_lok=Math.max(K2,KB); }
+        break; }
       case 'difuzor': case 'gecis': case 'gad': {
         const AR=b.A2/b.A1;
         if(AR<1.02){
           const Dm=0.5*(b.Dh1+b.Dh2), Am=0.5*(b.A1+b.A2), Vm=Q/Am, f=fPr(rho*Vm*Dm/mu);
-          b.A_q=b.A2; b.K_lok=f*b.L/Dm*(b.A2/Am)**2; b.par.AR=AR;
+          b.A_q=b.A2; b.K_lok=b.L>0?f*b.L/Dm*(b.A2/Am)**2:0; b.par.AR=AR;
         } else {
-          const th=Math.atan(0.5*(Math.sqrt(AR)-1)*b.Dh1/b.L), f=fPr(Re1);
-          const Kf=(1-1/AR**2)*f/(8*Math.sin(th)), Kex=KeKare(2*th/D2R)*((AR-1)/AR)**2;
+          const th=Math.atan((Math.sqrt(b.A2)-Math.sqrt(b.A1))/(SQPI*b.L)), f=fPr(Re1);
+          const Kf=(1-1/AR**2)*f/(8*Math.sin(th)), Kex=KeSekil(2*th/D2R,b.sekil)*((AR-1)/AR)**2;
           b.K_lok=Kf+Kex; b.par.theta=th/D2R; b.par.AR=AR; b.par.Kf=Kf; b.par.Kex=Kex;
         }
         break; }
@@ -138,34 +182,37 @@ function circuit(G,V,yer,h){
         break; }
     }
     b.K_ref=b.K_lok*(A_TS/b.A_q)**2; b.dp=b.K_ref*q_TS;
-    if(b.L>0){ A_duvar+=0.5*(perim(b.A1)+perim(b.A2))*b.L; hacim+=0.5*(b.A1+b.A2)*b.L; }
+    if(b.L>0){ A_duvar+=0.5*(perim(b.A1,b.sekil)+perim(b.A2,b.sekil))*b.L; hacim+=0.5*(b.A1+b.A2)*b.L; }
     if(b.tip==='esanjor') hx.Kref=b.K_ref;
   }
   const K_ham=B.reduce((s,b)=>s+b.K_ref,0), K_top=K_ham*G.leak, dp_top=K_top*q_TS;
   const P_hava=dp_top*Q, P_mil=P_hava/G.eta_fan, P_elek=P_mil/G.eta_m, P_jet=0.5*rho*V**3*A_TS;
-  const AR_gad=s_dn*s_dn/(G.s34*G.s34);
-  const gad={Kgerek:(AR_gad-1)/1.14,Ksum:Ksum_gad,AR:AR_gad};
+  /* wide-angle diffuser: [MB]/[B] 3.42 resistance, and Barlow Fig. 3.9 element count (2θ: the larger of the
+     equivalent and the flat-wall angle, conservative for a square section) */
+  const AR_gad=s_dn*s_dn/(G.s34*G.s34), nG=yer==='ayri'?G.gel.N:1;
+  const th2_duv=2*atand((s_dn-G.s34)/2/L_GAD), th2=Math.max(G.gad2th,th2_duv);
+  const gad={Kgerek:(AR_gad-1)/1.14,Ksum:Ksum_gad,AR:AR_gad,n:nG,th2_es:G.gad2th,th2_duv,th2,ARmax:fig39(nG,th2)};
   const AR_klasik=(G.s12**2/A_TS)*(G.s34**2/A_fan)*(A_fan/G.s12**2);
-  const nk=F.split+1;
-  const fanAng={dikey:atand((F.h-G.s12)/nk/2/G.L_gecis),yatay:atand((F.w-G.s12)/2/G.L_gecis),daralma:NaN};
-  if(AR3<=1.02&&L_D3>0) fanAng.daralma=atand(Math.max(F.h-G.s34,F.w-G.s34)/2/L_D3);
+  /* local wall angles of the square <-> round transitions: flat wall s/2 <-> D/2, diagonal s/√2 <-> D/2 */
+  const rD=F.D/2;
+  const fanAng={gec_duz:atand((rD-G.s12/2)/G.L_gecis),gec_kos:atand((rD-G.s12/Math.SQRT2)/G.L_gecis),
+    d3_duz:L_D3>0?atand((G.s34/2-rD)/L_D3):NaN,d3_kos:L_D3>0?atand((G.s34/Math.SQRT2-rD)/L_D3):NaN,
+    L_D3_es,L_D3_kos,d3_byWall:L_D3_kos>L_D3_es};
 
   /* contraction profile, 5th-order polynomial ([O] Eq. 138), and spray -> leading-edge travel time */
   const xs=[], yc=[], inv=[];
   for(let i=0;i<=100;i++){ const x=G.L_c*i/100, s=x/G.L_c, y=s_dn/2-(s_dn/2-a/2)*(6*s**5-15*s**4+10*s**3); xs.push(x); yc.push(y); inv.push(((2*y)**2)/Q); }
   const t_kalis=trapz(xs,inv)+G.mdl.x/V;
 
-  /* fan array */
-  let ncol, nrow;
-  if(F.w>=F.h){ ncol=Math.ceil(F.N/2); nrow=Math.ceil(F.N/ncol); } else { nrow=Math.ceil(F.N/2); ncol=Math.ceil(F.N/nrow); }
-  if(F.N<=2){ ncol=F.N; nrow=1; }
+  /* fan sizing estimate (pressure coefficient ψ, margin included) */
   const V_fc=Q/A_fanlar, U_uc=Math.sqrt(2*dp_top*G.marg/(rho*F.psi));
-  const fan={ncol,nrow,q_tek:Q/F.N,V_cikis:V_fc,dp_dyn:0.5*rho*V_fc*V_fc,dp_borda:0.5*rho*(V_fc-Q/A_fan)**2,oran:A_fanlar/A_fan,
-    U_uc,n_rpm:60*U_uc/(Math.PI*F.D),c_ax:(Q/F.N)/(Math.PI/4*F.D*F.D*(1-F.nu*F.nu)),cell:Math.min(F.w/ncol,F.h/nrow)};
-  fan.phi=fan.c_ax/U_uc; fan.M_uc=U_uc/h.a; fan.fits=F.D<=fan.cell;
+  const fan={ncol:1,nrow:1,q_tek:Q/F.N,V_cikis:V_fc,V_sec:Q/A_fan,oran:A_fanlar/A_fan,
+    U_uc,n_rpm:60*U_uc/(Math.PI*F.D),c_ax:(Q/F.N)/(Math.PI/4*F.D*F.D*(1-F.nu*F.nu))};
+  fan.phi=fan.c_ax/U_uc; fan.M_uc=U_uc/h.a;
+  const kb=B.find(b=>b.id==='kap'); if(kb) fan.V_an=kb.V;
 
-  const geo={a,s12:G.s12,s34:G.s34,s_dn,fan_w:F.w,fan_h:F.h,fan_N:F.N,fan_D:F.D,fan_ncol:ncol,fan_nrow:nrow,
-    L_TS:G.L_TS,L_D1,L_C12,L_gecis:G.L_gecis,L_fan:G.L_fan,L_D3,L_ust,L_ust_raw,L_C34,L_GAD,L_dn:G.L_dn,L_c:G.L_c,
+  const geo={a,s12:G.s12,s34:G.s34,s_dn,fan_w:F.w,fan_h:F.h,fan_N:F.N,fan_D:F.D,fan_ncol:1,fan_nrow:1,
+    L_TS:G.L_TS,L_D1,L_C12,L_gecis:G.L_gecis,L_fan:G.L_fan,L_kap,L_kapn,L_D3,L_ust,L_ust_raw,L_C34,L_GAD,L_dn:G.L_dn,L_c:G.L_c,
     H:G.H,X_alt:X,yer,gap,AR1,AR3};
   geo.boy=X+G.s34/2+G.s12/2; geo.en=G.H+s_dn/2+Math.max(G.s34,F.w)/2;
   return {V,Q,q_TS,A_TS,rho,mu,h,bil:B,K_ham,K_top,dp_top,P_hava,P_mil,P_elek,P_jet,ER:P_jet/P_hava,lambda:P_mil/P_jet,
@@ -212,7 +259,7 @@ function icing(R,G,h){
   o.Tskin=G.Tlab-qf/G.ins.ho; o.qwall=qf;
   const gm=Math.log(Math.max(1e-6,G.RH/100))+17.625*G.Tlab/(243.04+G.Tlab);
   o.Tdew=243.04*gm/(17.625-gm);
-  o.Tevap=T-12;
+  o.Tevap=T-G.ops.dTy;                                 /* secondary fluid ([BS]: air −20, fluid −32 °C) */
   return o;
 }
 
@@ -255,9 +302,11 @@ function geometryTable(R){
     ['Corner 1 (90°)',[g.s12,g.s12],[g.s12,g.s12],g.s12,'Corner','c1'],
     ['Duct, corner 1–2',[g.s12,g.s12],[g.s12,g.s12],g.L_C12,'Right short leg','l12'],
     ['Corner 2 (90°)',[g.s12,g.s12],[g.s12,g.s12],g.s12,'Corner','c2'],
-    ['Fan transition',[g.s12,g.s12],[g.fan_w,g.fan_h],g.L_gecis,'Upper (return) leg','gec'],
-    ['Fan section',[g.fan_w,g.fan_h],[g.fan_w,g.fan_h],g.L_fan,'Upper (return) leg','fan'],
-    [d3,[g.fan_w,g.fan_h],[g.s34,g.s34],g.L_D3,'Upper (return) leg','d3'],
+    ['Fan transition (square → round)',[g.s12,g.s12],[g.fan_w,g.fan_h],g.L_gecis,'Upper (return) leg','gec'],
+    ['Fan section (Ø'+(g.fan_D*100).toFixed(0)+' cm round)',[g.fan_w,g.fan_h],[g.fan_w,g.fan_h],g.L_fan,'Upper (return) leg','fan'],
+    ['Hub fairing + straightener',[g.fan_w,g.fan_h],[g.fan_w,g.fan_h],g.L_kap,'Upper (return) leg','kap'],
+    ['Hub closure cone',[g.fan_w,g.fan_h],[g.fan_w,g.fan_h],g.L_kapn,'Upper (return) leg','kapn'],
+    [d3+(d3==='Return diffuser'?' (round → square)':''),[g.fan_w,g.fan_h],[g.s34,g.s34],g.L_D3,'Upper (return) leg','d3'],
     ['Upper return duct',[g.s34,g.s34],[g.s34,g.s34],g.L_ust,'Upper (return) leg','ust'],
     ['Corner 3 (90°)',[g.s34,g.s34],[g.s34,g.s34],g.s34,'Corner','c3'],
     ['Duct, corner 3–4',[g.s34,g.s34],[g.s34,g.s34],g.L_C34,'Left short leg','l34'],
@@ -266,11 +315,15 @@ function geometryTable(R){
     ['Settling chamber',[g.s_dn,g.s_dn],[g.s_dn,g.s_dn],g.L_dn,'Lower (test) leg','dn'],
     ['Contraction (nozzle)',[g.s_dn,g.s_dn],[g.a,g.a],g.L_c,'Lower (test) leg','noz']
   ].filter(r=>!(r[3]===0&&!/Corner/.test(r[0])&&r[1][0]===r[2][0]&&r[1][1]===r[2][1]));
+  /* distance from the axis to the flat wall and to the diagonal edge of a section end; the round fan end
+     (carried as the equal-area square g.fan_w) is taken with its true diameter (yaricap_uc) */
+  const rad=W=>Math.abs(W-g.fan_w)<1e-9?[g.fan_D/2,g.fan_D/2]:[W/2,W/Math.SQRT2];
   let xx=0;
   return T.map((r,i)=>{
     const [W1,H1]=r[1], [W2,H2]=r[2], L=r[3], A1=W1*H1, A2=W2*H2, AR=A2/A1, Dh1=2*A1/(W1+H1), Dh2=2*A2/(W2+H2);
     let thE=NaN, thY=NaN, thD=NaN;
-    if(L>0&&!/Corner/.test(r[0])){ thY=atand((W2-W1)/2/L); thD=atand((H2-H1)/2/L); if(AR>1.02) thE=atand(0.5*(Math.sqrt(AR)-1)*Dh1/L); }
+    if(L>0&&!/Corner/.test(r[0])){ const r1=rad(W1), r2=rad(W2); thY=atand((r2[0]-r1[0])/L); thD=atand((r2[1]-r1[1])/L);
+      if(AR>1.02) thE=atand((Math.sqrt(A2)-Math.sqrt(A1))/(SQPI*L)); }
     const o={no:i+1,name:r[0],leg:r[4],id:r[5],W1,H1,W2,H2,A1,A2,AR,L,Dh1,Dh2,thE,thY,thD,V1:Q/A1,V2:Q/A2,x0:xx};
     xx+=L; o.x1=xx; return o;
   });
@@ -283,10 +336,122 @@ function sweep(G,yer,h,Vmax){
   return out;
 }
 
+/* ================ v1.6: scenarios, iced K, fan requirement, operating cycle ================ */
+/* scenario list: S1 = second point (G.Vs), S2 = design point (V); both at the static temperature T */
+function scenarios(G,V,yer,h,R){
+  const s1={id:'S1',name:'S1 · '+(+G.Vs.toFixed(1))+' m/s',V:G.Vs,Tc:G.Tc,h,yer,R:circuit(G,G.Vs,yer,h)};
+  const s2={id:'S2',name:'S2 · '+(+V.toFixed(1))+' m/s',V,Tc:G.Tc,h,yer,R:R||circuit(G,V,yer,h)};
+  return [s1,s2];
+}
+/* buz_durumlari: circuit loss once ice has built up, from literature factors.
+   [NO] NASA TM-87095 corner-1 vanes K ×1.5 after 10 min spray, ×5.4 severe; [NA2] NASA TM-100116 IRT coil Δp
+   "nearly tripled"; [B] p.101 diffuser stall behind a 2D model: up to 150% more power. λ = Δp / Δp_design. */
+function iced(G,s){
+  const Z=G.buz, R0=s.R, f=x=>+x.toFixed(2);
+  const S=[
+    {id:'dry',name:'Dry, fully clean circuit',hx:1,c1:1,ls:1,refs:[]},
+    {id:'design',name:'Design (corner 1 ×'+f(G.buz1)+', clean coil)',hx:1,c1:G.buz1,ls:1,refs:['NO']},
+    {id:'hx',name:'Coil Δp ×'+f(Z.hx),hx:Z.hx,c1:G.buz1,ls:1,refs:['NA2']},
+    {id:'c1',name:'Corner 1 K ×'+f(Z.c1),hx:1,c1:Z.c1,ls:1,refs:['NO']},
+    {id:'both',name:'Coil ×'+f(Z.hx)+' + corner 1 ×'+f(Z.c1),hx:Z.hx,c1:Z.c1,ls:1,refs:['NA2','NO']},
+    {id:'stall',name:'2D model, diffuser stall: power ×'+f(Z.stall),hx:1,c1:G.buz1,ls:Z.stall,refs:['B']}];
+  return S.map(o=>{
+    const Gs=Object.assign({},G,{buz1:o.c1,hx:Object.assign({},G.hx,{frost:G.hx.frost*o.hx})}), r=circuit(Gs,s.V,s.yer,s.h);
+    const K=r.K_top*o.ls, dp=r.dp_top*o.ls, lam=dp/R0.dp_top;
+    return Object.assign(o,{K,dp,lam,Khx:r.hx.Kref,P:dp*r.Q/G.eta_fan,ok:lam<=Z.lamF+1e-9});
+  });
+}
+/* fan_gereksinim: brand-independent fan requirement, the sheet to send to vendors */
+function fanReq(G,SN){
+  return SN.map(s=>{ const R=s.R, Pm0=R.dp_top*R.Q/G.eta_fan, PmL=G.buz.lamF*Pm0;
+    return {id:s.id,name:s.name,V:s.V,Tc:s.Tc,rho:R.rho,Q:R.Q,dp0:R.dp_top,dpL:G.buz.lamF*R.dp_top,Pm0,PmL,motor:1.15*PmL,PeL:PmL/G.eta_m,
+      Vfan:R.Q/(G.fan.w*G.fan.h),pf:PmL/R.P_jet}; });
+}
+/* isletme_cevrimi helpers. Lumped thermal mass C dT/dt = −Q_cool(T) + P_fan + UA (T_lab − T) + Q_spray,
+   Q_cool(T) = min(Q_cap, Q_cap (T − T_fluid)/ΔT_y), T_fluid = T_target − ΔT_y. */
+function sogut(T0,Th,Qk,Pf,UA,C,dTy,tol,Tlab,rec){
+  const Ta=Th-dTy, dt=5, te=[0], Te=[T0]; let t=0, T=T0;
+  if(Qk<=Pf+UA*(Tlab-(Th+tol))) return {t:Infinity,ok:false,te,Te};
+  while(T>Th+tol){
+    const Qs=Math.min(Qk,Qk*(T-Ta)/dTy), Qn=Qs-Pf-UA*(Tlab-T);
+    if(Qn<=0||t>48*3600) return {t:Infinity,ok:false,te,Te};
+    T-=Qn*dt/C; t+=dt; if(rec&&Math.round(t/dt)%24===0){ te.push(t); Te.push(T); }
+  }
+  te.push(t); Te.push(T); return {t,ok:true,te,Te};
+}
+/* isit: C dT/dt = P_in + UA (T_lab − T), T0 -> T1 (closed form) */
+function isit(T0,T1,C,Pin,UA,Tlab){ const a=UA/C, Teq=Tlab+Pin/UA; if(T1>=Teq) return Infinity; return -Math.log((Teq-T1)/(Teq-T0))/a; }
+/* dren: gravity drain (Torricelli, C_d 0.6, constant head) + run-off allowance [s] */
+function dren(m,O){ const Qd=O.n_drain*0.6*(Math.PI/4*O.d_drain**2)*Math.sqrt(2*9.81*O.h_drain); return (m/1000)/Qd+O.t_suz*60; }
+/* deney_sim: one spray run. The coil blocks as ice builds up on its first rows:
+   b(t) = 2 δ(t)/(pitch − t_fin), Δp_hx = Δp_hx,0/(1 − b)^n  ->  K(t) = K_0 + K_hx,0 [(1 − b)^−n − 1].
+   The run ends at λ ≥ λ_fan (fan cannot hold the speed), b ≥ b_max, a temperature drift ≥ ΔT_allow, or t_max. */
+function deney(G,s,LWC,f,kose,Qk,C,UA,fm){
+  const O=G.ops, Th=s.Tc, Rk=circuit(Object.assign({},G,{buz1:kose}),s.V,s.yer,s.h);
+  const K0=s.R.K_top, Kc=Rk.K_top, Khx=Rk.hx.Kref*G.leak, sd=Rk.geo.s_dn, A_y=2*(sd/O.hatve)*sd*O.L_buz;
+  const md=LWC*1e-3*s.V*Rk.A_TS, db=2*f*md/(O.rho_buz*A_y)/(O.hatve-O.t_kanat);
+  const qQ=Rk.q_TS*Rk.Q, Qsp=md*(4183*G.sp.Tw+334e3+2050*(0-Th)), dt=10;
+  let t=0, T=Th, Et=O.E_tampon, why='', b=0, lam=1;
+  const ts=[], lams=[], Ts=[];
+  for(;;){
+    b=db*t; lam=(Kc+Khx*(Math.pow(1-b,-O.n_tik)-1))/K0;
+    if(Math.round(t/dt)%3===0){ ts.push(t); lams.push(lam); Ts.push(T); }
+    if(lam>=G.buz.lamF){ why='lamF'; break; }
+    if(b>=O.b_max){ why='bmax'; break; }
+    if(T-Th>=O.dT_izin){ why='dT'; break; }
+    if(t>=O.t_max*60){ why='tmax'; break; }
+    const K=lam*K0, Pf=K*qQ/G.eta_fan*fm; let fz=Pf+UA*(G.Tlab-T)+Qsp-Qk;
+    if(fz>0&&Et>0){ const d=Math.min(Et,fz*dt); Et-=d; fz-=d/dt; }
+    T=fz>0?T+fz*dt/C:Math.max(Th,T+fz*dt/C); t+=dt;
+  }
+  const Kf=tt=>{ const bb=db*tt; return bb>=0.98?NaN:Kc+Khx*(Math.pow(1-bb,-O.n_tik)-1); };
+  return {t,why,lam,b,K0,Kc,Kf,ts,lams,Ts,db};
+}
+const WHY={lamF:'fan margin λ_fan used up',bmax:'coil blocked (b_max)',dT:'temperature drift (cooling too small)',tmax:'table limit'};
+function ops(G,SN){
+  const O=G.ops, Z=O.coz, U=1/(1/G.ins.hi+G.ins.t/G.ins.k+1/G.ins.ho), R1=SN[0].R, UA=U*R1.A_duvar;
+  const Cb={shell:O.rho_ic*O.t_ic*R1.A_duvar*O.c_ic, ins:O.f_yal*G.ins.t*R1.A_duvar*O.rho_yal*O.c_yal,
+    hx:O.m_hx*O.c_hx+O.V_sivi*O.rho_sivi*O.c_sivi, inner:O.m_ic*O.c_icd, air:R1.hacim*SN[0].h.rho*1005};
+  const C=Cb.shell+Cb.ins+Cb.hx+Cb.inner+Cb.air, fm=G.motorIn?1/G.eta_m:1, Qk=O.Q_sec;
+  /* 1) steady refrigeration load at the target temperature */
+  const load=SN.map(s=>{ const R=s.R, Pf0=R.P_mil*fm, PfL=G.buz.lamF*Pf0, Qd=UA*(G.Tlab-s.Tc);
+    return [0].concat(O.LWC).map(L=>{ const md=L*1e-3*R.Q, Qsp=md*(4183*G.sp.Tw+334e3+2050*(0-s.Tc)); return {LWC:L,Pf0,PfL,Qd,Qsp,tot:Pf0+Qd+Qsp,totL:PfL+Qd+Qsp}; }); });
+  /* 2) initial cool-down from the lab temperature; the moisture of the loop air freezes out on the coil once */
+  const E_nem=(R1.hacim*1.2*O.w0)*(2.501e6+334e3);
+  const cool=SN.map(s=>{ const Pf=circuit(G,O.V_sog,s.yer,s.h).P_mil*fm, Ceff=C+E_nem/(G.Tlab-s.Tc);
+    return O.Q_kap.map(q=>Object.assign({Qk:q},sogut(G.Tlab,s.Tc,q,Pf,UA,Ceff,O.dTy,O.tol,G.Tlab,true))); });
+  /* 3) run time with the spray on: nominal (coil holds f_nom of the water, corner 1 design factor) and
+        worst (coil holds all of it, corner 1 severe factor from the start) */
+  const run=SN.map(s=>O.LWC.map(L=>({LWC:L,nom:deney(G,s,L,O.f_su[0],G.buz1,Qk,C,UA,fm),worst:deney(G,s,L,O.f_su[1],G.buz.c1,Qk,C,UA,fm)})));
+  /* 4) de-icing + drain + re-cooling, and the number of runs in a working day.
+        A: whole tunnel warmed to T_end by an air heater (+ fan, walls). B: coil defrost only (corner/wall ice stays). */
+  const t_sp=10*60;
+  const cyc=SN.map((s,j)=>{
+    const Th=s.Tc, Pf_sog=circuit(G,O.V_sog,s.yer,s.h).P_mil*fm, Pf_coz=circuit(G,Z.V_fan,s.yer,s.h).P_mil*fm;
+    const ilk=sogut(G.Tlab,Th,Qk,Pf_sog,UA,C,O.dTy,O.tol,G.Tlab);
+    return run[j].map(rr=>{
+      const tsp=Math.min(rr.nom.t,t_sp), m_su=rr.LWC*1e-3*s.R.Q*tsp, m_hx=O.f_su[0]*m_su;
+      const Pin=Z.P_isit+Pf_coz;
+      const t1=isit(Th,0,C+m_su*2050,Pin,UA,G.Tlab), t2=m_su*334e3/(Pin+UA*(G.Tlab-0)), t3=isit(0,Z.T_son,C+m_su*4183,Pin,UA,G.Tlab);
+      const tA=t1+t2+t3, tdA=dren(m_su,Z), sA=sogut(Z.T_son,Th,Qk,Pf_sog,UA,C,O.dTy,O.tol,G.Tlab);
+      const Chx=Cb.hx, Cr=C-Chx, EB=Chx*(Z.T_son-Th)+m_hx*(2050*(0-Th)+334e3+4183*Z.T_son), tB=EB/(Z.eta_def*Z.P_def);
+      const dTr=((1-Z.eta_def)*EB+UA*(G.Tlab-Th)*tB)/Cr, tdB=dren(m_hx,Z), Qn=Qk-Pf_sog-UA*(G.Tlab-Th);
+      const tsB=Qn>0?(Chx*(Z.T_son-Th)+Cr*dTr)/Qn:Infinity;
+      const AT=sA.ok?(tA+tdA+sA.t)/60:Infinity, BT=(tB+tdB+tsB)/60;
+      let cA=NaN, cB=NaN, nA=0, nB=0;
+      if(ilk.ok){ const kalan=O.t_gun*60-ilk.t/60; cA=tsp/60+AT+Z.t_hazir; cB=tsp/60+BT+Z.t_hazir;
+        nA=isFinite(cA)?Math.max(0,Math.floor((kalan+sA.t/60)/cA)):0; nB=isFinite(cB)?Math.max(0,Math.floor((kalan+tsB/60)/cB)):0; }
+      return {LWC:rr.LWC,tsp,m_su,m_hx,A:{coz:tA,dren:tdA,sog:sA.t,tot:AT},B:{coz:tB,dren:tdB,sog:tsB,tot:BT,dT:dTr},ilk:ilk.t,ilkOk:ilk.ok,cA,nA,cB,nB};
+    });
+  });
+  return {C,Cb,UA,E_nem,fm,Qk,load,cool,run,cyc};
+}
+
 /* ---------------- design audit ----------------
    Every check: {id, sev: ok|info|warn|bad, cat, title, where (path id), val, lim, msg, fix, refs[], fields[], gauge}
    gauge: {v, lo, hi, zones:[[from,to,sev],...], fmt} drawn as a scale with the current value marked. */
 function audit(R,G,h,IC){
+  /* IC: icing() output; v1.6 icing margin and cooling checks below compute what they need from R, G, h */
   const C=[], g=R.geo, B=R.bil, by=id=>B.find(b=>b.id===id);
   const nf=(x,d)=>isFinite(x)?x.toFixed(d):'—';
   const add=o=>{ C.push(Object.assign({refs:[],fields:[],cat:'Flow'},o)); };
@@ -306,34 +471,33 @@ function audit(R,G,h,IC){
   if(gec&&gec.par.theta!=null){ const t=gec.par.theta;
     add({id:'gec',cat:'Separation',where:'gec',sev:t<=3.5+1e-9?'ok':t<=5?'warn':'bad',title:'Fan transition: equivalent cone angle',
       val:'θe = '+nf(t,2)+'°',lim:'≤ 3.5°',
-      msg:'Square '+nf(g.s12*100,0)+' cm → '+nf(g.fan_w*100,0)+'×'+nf(g.fan_h*100,0)+' cm over '+nf(g.L_gecis,2)+' m (AR '+nf(gec.par.AR,2)+'). Flow entering a fan array must be attached and uniform.',
-      fix:'Lengthen the transition or bring the fan section closer to corner-2 size.',
-      refs:['B','E'],fields:['Lgec','fw','fh','s12'],gauge:{v:t,lo:0,hi:7,zones:[[0,3.5,'ok'],[3.5,5,'warn'],[5,7,'bad']],u:'°'}});
+      msg:'Square '+nf(g.s12*100,0)+' cm → round Ø'+nf(g.fan_D*100,0)+' cm over '+nf(g.L_gecis,2)+' m (AR '+nf(gec.par.AR,2)+'). The fan must see attached, uniform inflow.',
+      fix:'Lengthen the transition or bring the fan diameter closer to the corner-2 size.',
+      refs:['B','E'],fields:['Lgec','fD','s12'],gauge:{v:t,lo:0,hi:7,zones:[[0,3.5,'ok'],[3.5,5,'warn'],[5,7,'bad']],u:'°'}});
   }
-  { const w=Math.max(R.fanAng.dikey,R.fanAng.yatay);
-    add({id:'gecw',cat:'Separation',where:'gec',sev:w<=5?'ok':w<=7?'warn':'bad',title:'Fan transition: wall angle per plane',
-      val:'vertical '+nf(R.fanAng.dikey,1)+'°, horizontal '+nf(R.fanAng.yatay,1)+'°',lim:'≤ 5° per wall',
-      msg:w<=5?'Each wall opens gently enough. Note that an equivalent cone angle can hide one plane opening much faster than the other.'
-        :'One plane opens faster than a planar diffuser tolerates; a 2D CFD study for this project separated at 2θ = 12.8°. The equivalent cone angle alone does not show this.',
-      fix:'Add horizontal splitter plates (splitters field) or lengthen the transition.',
-      refs:['B'],fields:['fsplit','Lgec','fw','fh'],gauge:{v:w,lo:0,hi:10,zones:[[0,5,'ok'],[5,7,'warn'],[7,10,'bad']],u:'°'}});
+  { const A=R.fanAng, w=Math.max(A.gec_duz,A.gec_kos), lim=G.duvar;
+    add({id:'gecw',cat:'Separation',where:'gec',sev:w<=lim+1e-9?'ok':w<=lim+2?'warn':'bad',title:'Fan transition: local wall angles',
+      val:'flat wall '+nf(A.gec_duz,1)+'°, diagonal '+nf(A.gec_kos,1)+'°',lim:'≤ '+nf(lim,1)+'° each',
+      msg:w<=lim+1e-9?'Square to round: the flat walls open from s/2 to D/2 while the corners close in from s/√2 to D/2. Both stay gentle. An equivalent cone angle alone hides this difference.'
+        :'One wall of the square-to-round transition opens faster than the limit; a 2D CFD study for this project separated at 2θ = 12.8°, and Barlow notes 10–12° effective expansion separates behind a hub.',
+      fix:'Lengthen the fan transition.',refs:['B'],fields:['Lgec','fD','duvar'],gauge:{v:w,lo:0,hi:10,zones:[[0,lim,'ok'],[lim,lim+2,'warn'],[lim+2,10,'bad']],u:'°'}});
+  }
+  const kn=by('kapn');
+  if(kn&&kn.par.theta!=null){ const t=kn.par.theta;
+    add({id:'kapn',cat:'Separation',where:'kapn',sev:t<=5+1e-9?'ok':t<=7?'warn':'bad',title:'Hub closure cone',val:'θe = '+nf(t,2)+'°',lim:'≤ 5°',
+      msg:'Behind the straightener the enlarged hub ('+nf(G.fan.nuk,2)+' D) closes over '+nf(kn.L,2)+' m and the annulus opens back to the full Ø'+nf(g.fan_D*100,0)+' cm. Barlow keeps this tail at an equivalent angle of about 5° or less.',
+      fix:'Lengthen the hub closure or reduce the fairing hub ratio.',refs:['B'],fields:['Lkapn','nuk'],gauge:{v:t,lo:0,hi:9,zones:[[0,5,'ok'],[5,7,'warn'],[7,9,'bad']],u:'°'}});
   }
   const d3=by('d3');
-  if(d3){
-    if(d3.par.theta!=null){ const t=d3.par.theta;
-      add({id:'d3',cat:'Separation',where:'d3',sev:t<=3.5+1e-9?'ok':t<=5?'warn':'bad',title:'Return diffuser cone angle',val:'θe = '+nf(t,2)+'°',lim:'≤ 3.5°',
-        msg:'Behind the fan the swirl and wakes thicken the boundary layer; keep the return diffuser conservative.',fix:'Reduce θ₃ or s₃₄.',
-        refs:['B','E'],fields:['th3','s34'],gauge:{v:t,lo:0,hi:7,zones:[[0,3.5,'ok'],[3.5,5,'warn'],[5,7,'bad']],u:'°'}});
-    } else if(isFinite(R.fanAng.daralma)){ const t=R.fanAng.daralma;
-      add({id:'d3c',cat:'Separation',where:'d3',sev:t<=20?'ok':'warn',title:'Post-fan contraction wall angle',val:nf(t,0)+'°',lim:'≤ 20°',
-        msg:t<=20?'Mild contraction behind the fans.':'Practically an abrupt contraction: the friction model used here underestimates its loss.',
-        fix:'Lengthen the post-fan contraction.',refs:['B'],fields:['Lfd'],gauge:{v:t,lo:0,hi:40,zones:[[0,20,'ok'],[20,40,'warn']],u:'°'}});
-    }
+  if(d3&&d3.par.theta!=null){ const t=d3.par.theta, A=R.fanAng;
+    add({id:'d3',cat:'Separation',where:'d3',sev:t<=3.5+1e-9?'ok':t<=5?'warn':'bad',title:'Return diffuser cone angle',val:'θe = '+nf(t,2)+'°',lim:'≤ 3.5°',
+      msg:'Round Ø'+nf(g.fan_D*100,0)+' → square '+nf(g.s34*100,0)+' cm over '+nf(d3.L,2)+' m. The length is the larger of the θ₃ value ('+nf(A.L_D3_es,2)+' m) and the one that keeps the diagonal wall at '+nf(G.duvar,1)+'° ('+nf(A.L_D3_kos,2)+' m)'+(A.d3_byWall?'; here the diagonal sets it.':'.'),
+      fix:'Reduce θ₃ or s₃₄.',refs:['B','E'],fields:['th3','s34','duvar'],gauge:{v:t,lo:0,hi:7,zones:[[0,3.5,'ok'],[3.5,5,'warn'],[5,7,'bad']],u:'°'}});
   }
   add({id:'arc',cat:'Separation',where:'gec',sev:R.AR_klasik<=6?'ok':'warn',title:'Total area ratio of conventional diffusers',val:'AR = '+nf(R.AR_klasik,2),lim:'≤ 5–6',
     msg:R.AR_klasik<=6?'The first and return diffusers together stay within the usual budget; the rest of the expansion is left to the wide-angle diffuser.'
       :'Asking the conventional diffusers for more than 5–6× expansion makes them long or steep; a wide-angle diffuser with screens should take part of it.',
-    fix:'Shift expansion to the wide-angle diffuser (smaller s₃₄) or reduce s₁₂.',refs:['B'],fields:['s12','s34','fw','fh'],
+    fix:'Shift expansion to the wide-angle diffuser (smaller s₃₄) or reduce s₁₂.',refs:['B'],fields:['s12','s34','fD'],
     gauge:{v:R.AR_klasik,lo:1,hi:8,zones:[[1,6,'ok'],[6,8,'warn']],u:''}});
 
   /* ---- wide-angle diffuser ---- */
@@ -345,11 +509,11 @@ function audit(R,G,h,IC){
       fix:R.yer==='ayri'?'Add WAD screens or use finer mesh (lower open area).':'Raise the heat exchanger resistance, add a screen, or reduce the WAD area ratio (lower CR or larger s₃₄).',
       refs:['MB','B'],fields:['yer','gN','gdw','gwm','hxdp','CR','s34'],
       gauge:{v:s.Ksum/Math.max(1e-9,s.Kgerek),lo:0,hi:3,zones:[[0,1,'bad'],[1,3,'ok']],u:'× required',fmtv:x=>nf(x,2)+'×'}});
-    const t2=G.gad2th;
-    add({id:'gadg',cat:'Separation',where:'gad',sev:(t2>50||s.AR>4)?'warn':'info',title:'Wide-angle diffuser geometry',val:'2θ = '+nf(t2,0)+'°, AR = '+nf(s.AR,2),lim:'chart [B] Fig. 3.9',
-      msg:(t2>50||s.AR>4)?'Angle or area ratio is beyond what a single short element usually handles; check the number of screens needed against the design chart.'
-        :'Check 2θ and AR against the wide-angle-diffuser design chart for the number of screens required.',
-      fix:'Use the chart to pick the screen count, or reduce 2θ.',refs:['B','MB'],fields:['gad2th','CR','s34']});
+    const ok39=s.AR<=s.ARmax+1e-9;
+    add({id:'gadg',cat:'Separation',where:'gad',sev:ok39?'ok':'warn',title:'Wide-angle diffuser: Barlow Fig. 3.9',val:'AR '+nf(s.AR,2)+' vs limit '+nf(s.ARmax,2),lim:s.n+' element'+(s.n===1?'':'s')+' at 2θ '+nf(s.th2,1)+'°',
+      msg:(ok39?'Inside the successful region of the design chart':'Outside the successful region of the design chart')+' for '+s.n+' element'+(s.n===1?'':'s')+' ('+(R.yer==='ayri'?'WAD screens':'the heat exchanger')+'). 2θ is taken as the larger of the equivalent angle ('+nf(s.th2_es,1)+'°) and the flat-wall angle ('+nf(s.th2_duv,1)+'°).',
+      fix:'Reduce 2θ, or add a screen about a third of the way along the wide-angle diffuser.',refs:['B','MB'],fields:['gad2th','CR','s34','gN'],
+      gauge:{v:s.AR/Math.max(1e-9,s.ARmax),lo:0,hi:1.6,zones:[[0,1,'ok'],[1,1.6,'warn']],u:'',fmtv:x=>nf(x*100,0)+'% of limit'}});
   }
 
   /* ---- contraction ---- */
@@ -421,14 +585,16 @@ function audit(R,G,h,IC){
 
   /* ---- fan ---- */
   { const f=R.fan;
-    add({id:'ffit',cat:'Fan',where:'fan',sev:f.fits?'ok':'bad',title:'Fan array fits the section',val:G.fan.N+' × Ø'+nf(G.fan.D*100,0)+' cm in '+f.ncol+'×'+f.nrow,lim:'Ø ≤ cell '+nf(f.cell*100,0)+' cm',
-      msg:f.fits?'Each fan fits its cell.':'The fans do not fit in the fan section.',fix:'Reduce the fan diameter or enlarge the fan section.',refs:[],fields:['fN','fD','fw','fh']});
-    add({id:'fcov',cat:'Fan',where:'fan',sev:f.oran<0.5?'warn':'ok',title:'Fan outlet coverage',val:nf(f.oran*100,0)+'% of section',lim:'≥ 50%',
-      msg:f.oran<0.5?'The fan jets fill only part of the section; the sudden expansion behind them costs '+nf(f.dp_borda,0)+' Pa and leaves a highly non-uniform flow into the return duct.':'Fan jets cover most of the section; the Borda-Carnot expansion behind them is '+nf(f.dp_borda,0)+' Pa.',
-      fix:'Larger fans, or a diffuser cone per fan.',refs:['B'],fields:['fD','fN','fw','fh'],gauge:{v:f.oran,lo:0,hi:1,zones:[[0,0.5,'warn'],[0.5,1,'ok']],u:''}});
     add({id:'ftip',cat:'Fan',where:'fan',sev:f.M_uc>0.4?'warn':'ok',title:'Fan tip speed (sizing estimate)',val:'U = '+nf(f.U_uc,0)+' m/s, M = '+nf(f.M_uc,2),lim:'M_tip ≲ 0.4 (rule of thumb)',
-      msg:f.M_uc>0.4?'High tip Mach number: noise and blade loading increase quickly; at −20 °C the speed of sound is lower too.':'Moderate tip speed for the pressure needed (ψ = '+nf(G.fan.psi,2)+').',
-      fix:'More or larger fans, or a higher-pressure blade design.',refs:[],fields:['psi','fD','fN']});
+      msg:f.M_uc>0.4?'High tip Mach number: noise and blade loading increase quickly; at '+nf(G.Tc,0)+' °C the speed of sound is lower too.':'Moderate tip speed for the pressure needed (ψ = '+nf(G.fan.psi,2)+', '+nf(f.n_rpm,0)+' rpm on Ø'+nf(G.fan.D*100,0)+' cm).',
+      fix:'A larger fan, or a higher-pressure blade design.',refs:[],fields:['psi','fD']});
+    /* v1.6: the fan holds the speed until the circuit loss reaches λ_fan × design; literature icing cases */
+    const ICE=iced(G,{V:R.V,yer:R.yer,h,R}), lit=ICE.filter(x=>x.id!=='stall'), worst=lit.reduce((a,b)=>b.lam>a.lam?b:a), st=ICE.find(x=>x.id==='stall');
+    add({id:'lamf',cat:'Icing',where:'fan',sev:worst.lam>G.buz.lamF+1e-9?'warn':'ok',title:'Fan icing margin λ_fan',val:'worst λ = '+nf(worst.lam,2)+' vs λ_fan '+nf(G.buz.lamF,2),lim:'iced Δp ≤ λ_fan × design',
+      msg:(worst.lam>G.buz.lamF+1e-9?'“'+worst.name+'” needs more pressure than the fan is specified for: the test speed drops during the run.':'Every literature icing case (coil and corner-1 ice, alone and together) stays inside the fan margin; the worst is “'+worst.name+'”.')+
+        ' A stalled diffuser behind a large 2D model (λ = '+nf(st.lam,2)+') '+(st.ok?'is covered as well.':'is not covered; it is avoided by limiting model size and angle of attack.'),
+      fix:'Raise λ_fan in the fan specification, or lower the coil resistance.',refs:['NA2','NO','B','BS'],fields:['lamF','bzHx','bzC1'],
+      gauge:{v:worst.lam,lo:1,hi:3,zones:[[1,G.buz.lamF,'ok'],[G.buz.lamF,3,'warn']],u:''}});
     const er=R.ER;
     add({id:'er',cat:'Fan',where:'fan',sev:er<1.5?'bad':er<3?'warn':er<=7?'ok':'info',title:'Energy ratio',val:'ER = '+nf(er,2),lim:'3–7 for closed circuits',
       msg:er<3?'The circuit loses a large share of the jet power. In an icing tunnel the heat exchanger and frosted vanes are the usual causes ('+nf(R.lambda,2)+' kW shaft per kW jet).':er<=7?'A well-balanced closed circuit.':'Very efficient on paper: check the loss assumptions (heat exchanger, model drag).',
@@ -485,9 +651,16 @@ function audit(R,G,h,IC){
     add({id:'cond',cat:'Thermal',where:'ust',sev:s?'warn':'ok',title:'Outer-skin condensation',val:'skin '+nf(IC.Tskin,1)+' °C vs dew point '+nf(IC.Tdew,1)+' °C',lim:'skin > dew point',
       msg:s?'The outside of the insulated duct is colder than the lab dew point: water will condense (and drip) on it.':'Insulation keeps the outer skin above the lab dew point ('+nf(G.RH,0)+'% RH).',
       fix:'Thicker or better insulation.',refs:['MG'],fields:['it','ik','RH','Tlab']});
-    add({id:'evap',cat:'Thermal',where:'hx',sev:'info',title:'Refrigeration at low evaporating temperature',val:'≈ '+nf(IC.Tevap,0)+' °C evaporating',lim:'—',
-      msg:'For air at '+nf(G.Tc,0)+' °C the refrigerant evaporates around '+nf(IC.Tevap,0)+' °C. Catalogue capacities are quoted much warmer and drop substantially here.',
-      fix:'Ask the vendor for capacity at the actual evaporating temperature.',refs:['BS'],fields:['T','tmarg']});
+    const deep=IC.Tevap<-40;
+    add({id:'evap',cat:'Thermal',where:'hx',sev:deep?'warn':'info',title:'Refrigeration at low temperature',val:'secondary fluid ≈ '+nf(IC.Tevap,0)+' °C',lim:deep?'single stage ≳ −40 °C':'—',
+      msg:'For air at '+nf(G.Tc,0)+' °C the secondary fluid runs about '+nf(G.ops.dTy,0)+' K colder, near '+nf(IC.Tevap,0)+' °C, and the refrigerant evaporates lower still.'+(deep?' A single-stage unit does not reach this: a two-stage or cascade unit (e.g. with CO₂) is needed, and its capacity must be quoted at this temperature.':' Catalogue capacities are quoted much warmer and drop substantially here.'),
+      fix:'Ask the vendor for capacity at the actual evaporating temperature.',refs:['BS'],fields:['T','dTy','Qk']});
+    const TB=thermal(R,G,G.LWC,h), TL=TB.top+(G.buz.lamF-1)*(TB.fan+TB.motor), Qk=G.ops.Q_sec;
+    add({id:'qcap',cat:'Thermal',where:'hx',sev:Qk>=TL?'ok':Qk>=TB.top?'warn':'bad',title:'Refrigeration capacity, spray on',val:nf(Qk/1000,0)+' kW vs '+nf(TB.top/1000,1)+'–'+nf(TL/1000,1)+' kW',lim:'≥ load at λ_fan',
+      msg:Qk>=TL?'The unit holds '+nf(G.Tc,0)+' °C at '+nf(R.V,0)+' m/s and '+nf(G.LWC,2)+' g/m³ even with the iced-circuit fan power (λ_fan).'
+        :Qk>=TB.top?'Enough for the clean circuit, but as ice raises the fan power towards λ_fan the air warms up: runs end on the temperature-drift limit.'
+        :'Below the steady load with the spray on: the air temperature cannot be held at this speed and LWC.',
+      fix:'Increase the refrigeration capacity, or test at lower speed / LWC.',refs:['BS'],fields:['Qk','LWC','V']});
   }
   add({id:'leak',cat:'Fan',where:'fan',sev:'info',title:'Leakage and joints allowance',val:'× '+nf(G.leak,2),lim:'—',
     msg:'Total K is multiplied by '+nf(G.leak,2)+' for leakage and joints; this typically lowers ER by about 10%.',fix:'—',refs:['B'],fields:['leak']});
@@ -497,5 +670,5 @@ function audit(R,G,h,IC){
   return C;
 }
 
-window.IcingEngine={REFS,air,fPr,KeKare,KeDaire,circuit,thermal,icing,pchip,fanPoint,geometryTable,sweep,audit};
+window.IcingEngine={REFS,WHY,air,fPr,KeKare,KeDaire,KeSekil,fig39,circuit,thermal,icing,pchip,fanPoint,geometryTable,sweep,scenarios,iced,fanReq,ops,audit};
 })();

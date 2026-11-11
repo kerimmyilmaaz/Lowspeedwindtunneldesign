@@ -696,12 +696,12 @@ input[type=range]::-moz-range-thumb{width:12px;height:24px;border-radius:4px;bac
     <header class="top">
       <div class="mark"><span class="wm">SMOKE<em>LINE</em></span><div class="cswitch" role="tablist" aria-label="Tunnel type" data-on="closed"><a role="tab" href="./" data-circuit="open" aria-selected="false"><svg viewBox="0 0 22 12" aria-hidden="true"><path d="M1 2h5l4 3h4l7-3M1 10h5l4-3h4l7 3"/></svg><span class="cs-t">Open circuit</span></a><a role="tab" href="#icing" data-circuit="closed" aria-selected="true"><svg viewBox="0 0 22 12" aria-hidden="true"><rect x="1" y="1" width="20" height="10" rx="2.5"/><path d="M6 6h10"/></svg><span class="cs-t">Closed · Icing</span></a><span class="cs-ind" aria-hidden="true"></span></div><span class="ver">CLOSED CIRCUIT · <b>ICING</b> · SINGLE RETURN · 1D SIZING</span></div>
       <nav class="jump" aria-label="Sections (closed circuit)">
-        <a href="#icing" data-igo="izoom">Icing close-up</a><a href="#icing" data-igo="iaudit">Audit</a><a href="#icing" data-igo="iloss">Loss loop</a><a href="#icing" data-igo="igeo">Geometry</a><a href="#icing" data-igo="itherm">Thermal</a><a href="#icing" data-igo="ifan">Fans</a><a href="#icing" data-igo="isweep">Sweep</a><a href="#icing" data-igo="isheet">Datasheet</a>
+        <a href="#icing" data-igo="izoom">Icing close-up</a><a href="#icing" data-igo="iaudit">Audit</a><a href="#icing" data-igo="iloss">Loss loop</a><a href="#icing" data-igo="igeo">Geometry</a><a href="#icing" data-igo="itherm">Thermal</a><a href="#icing" data-igo="iops">Operation</a><a href="#icing" data-igo="ifan">Fan</a><a href="#icing" data-igo="isweep">Sweep</a><a href="#icing" data-igo="isheet">Datasheet</a>
       </nav>
     </header>
     <div class="hero-head" id="iheroHead">
       <h1 id="ih1"><span class="w-in">Recirculate.</span><span class="w-ex">Supercool.</span><span class="w-mid">Watch it freeze.</span></h1>
-      <p class="lede">A live computation sheet for a <b>closed-circuit icing wind tunnel</b>: one return leg, four vaned corners, a fan array, a wide-angle diffuser with the cooling coil, spray bars in the settling chamber. Change any dimension and every loss, the fan duty, the refrigeration load and a <b>literature-based design audit</b> update at once. Then export the tunnel as a PDF datasheet.</p>
+      <p class="lede">A live computation sheet for a <b>closed-circuit icing wind tunnel</b>: one return leg, four vaned corners, a single axial fan with a hub fairing and straightener, a wide-angle diffuser with the cooling coil, spray bars in the settling chamber. Change any dimension and every loss, the fan duty, the iced-circuit margin, the refrigeration load, the operating cycle and a <b>literature-based design audit</b> update at once. Then export the tunnel as a PDF datasheet.</p>
     </div>
     <div class="itunnel" id="itunnel">
       <canvas class="cvB" aria-hidden="true"></canvas>
@@ -743,7 +743,7 @@ input[type=range]::-moz-range-thumb{width:12px;height:24px;border-radius:4px;bac
     <div class="shead"><div class="secno" aria-hidden="true">!</div><div>
       <p class="eyebrow">Design audit · Barlow · Mehta &amp; Bradshaw · Bell &amp; Mehta · Bansmer</p>
       <h2 id="h-iaudit" class="irv isplit">Will the flow stay attached?</h2>
-      <p class="sub irv" style="--i:2">Every edit is checked against published design rules: diffuser angles and area ratios for separation, screen and honeycomb proportions for flow quality, the wide-angle-diffuser resistance criterion, droplet supercooling, coil face velocity, fan fit, outer-skin condensation. Pins show where each issue sits in the circuit.</p>
+      <p class="sub irv" style="--i:2">Every edit is checked against published design rules: equivalent cone angles and local wall angles of the square-to-round transitions, the wide-angle-diffuser resistance criterion and Barlow's Fig. 3.9, screen and honeycomb proportions, droplet supercooling, coil face velocity, the fan icing margin, refrigeration capacity, outer-skin condensation. Pins show where each issue sits in the circuit.</p>
     </div></div>
     <div class="au-top" id="iauTop"></div>
     <div class="au-wrap">
@@ -797,26 +797,57 @@ input[type=range]::-moz-range-thumb{width:12px;height:24px;border-radius:4px;bac
     </div>
   </section>
 
+  <section class="blk" id="iops" aria-labelledby="h-iops">
+    <div class="shead"><div class="secno" aria-hidden="true">λ</div><div>
+      <p class="eyebrow">kapali_devre_1D.m §10 · buzlu K · isletme_cevrimi</p>
+      <h2 id="h-iops" class="irv isplit">Icing scenarios and operating cycle</h2>
+      <p class="sub irv" style="--i:2">Two scenarios at the same temperature: S1 at the second speed, S2 at the design speed. Ice on the coil and the corner-1 vanes raises the circuit loss; the fan is specified to hold the speed up to λ_fan times the design loss. A lumped thermal mass then gives the cool-down, how long a spray run lasts, de-icing and the number of runs in a day.</p>
+    </div></div>
+    <div class="ops">
+      <div class="fan ops-kpi irv" id="iopsKpi"></div>
+      <div>
+        <h3 class="ops-h">Circuit loss once ice builds up</h3>
+        <p class="ops-sub">λ = Δp / Δp<sub>design</sub>. Literature factors: coil Δp [NA2], corner-1 vanes [NO], diffuser stall behind a 2D model [B p.101].</p>
+        <div class="tscroll irv"><table class="stab mini" id="iopsIce" style="min-width:760px"></table></div>
+      </div>
+      <div class="ops-two">
+        <div class="chart irv" id="iopsLam"><h3>λ during a run at 1 g/m³ (solid nominal, dashed worst)</h3><div class="ch"></div></div>
+        <div class="chart irv" id="iopsCool" style="--i:2"><h3>First cool-down: air above target [K]</h3><div class="ch"></div></div>
+      </div>
+      <div>
+        <h3 class="ops-h">How long a spray run lasts</h3>
+        <p class="ops-sub">Nominal: the coil catches part of the water, corner 1 at its design factor. Worst: the coil catches all of it and corner 1 is severely iced from the start.</p>
+        <div class="tscroll irv"><table class="stab mini" id="iopsRun" style="min-width:760px"></table></div>
+      </div>
+      <div>
+        <h3 class="ops-h">De-icing, drain, re-cooling and runs per day [min]</h3>
+        <div class="tscroll irv"><table class="stab mini" id="iopsCyc" style="min-width:860px"></table></div>
+        <p class="note" id="iopsNote" style="margin:10px 0 0"></p>
+      </div>
+    </div>
+  </section>
+
   <section class="blk" id="ifan" aria-labelledby="h-ifan">
-    <div class="shead"><div class="secno" aria-hidden="true">×4</div><div>
-      <p class="eyebrow">kapali_devre_1D.m §3 · fan_rapor</p>
-      <h2 id="h-ifan" class="irv isplit">Fan array</h2>
-      <p class="sub irv" style="--i:2">A rectangular fan section with several small fans in parallel. Sizing numbers use the pressure coefficient ψ; paste a manufacturer curve to find the real operating point.</p>
+    <div class="shead"><div class="secno" aria-hidden="true">Ø</div><div>
+      <p class="eyebrow">kapali_devre_1D.m §3 · fan_rapor · fan_gereksinim</p>
+      <h2 id="h-ifan" class="irv isplit">Fan</h2>
+      <p class="sub irv" style="--i:2">One axial fan in a round section, reached through a square-to-round transition. Behind it an enlarged hub carries the straightener vanes and closes in a cone before the round-to-square return diffuser. No fan is chosen yet: the requirement below is brand-independent. Sizing numbers use the pressure coefficient ψ; paste a manufacturer curve to find the real operating point.</p>
     </div></div>
     <div class="fan-grid">
       <div class="fan-face irv" id="ifanFace"></div>
       <div>
         <div class="fan irv" id="ifanTiles2" style="margin-top:0"></div>
+        <div class="freq irv" id="ifanReq"></div>
         <div class="fcurve irv" style="--i:2">
-          <h3>Manufacturer curve (per fan)</h3>
+          <h3>Manufacturer curve (full speed)</h3>
           <div class="row">
             <label>Q [m³/h]<textarea id="fcQ" rows="2" spellcheck="false"></textarea></label>
-            <label>Static Δp [Pa]<textarea id="fcdp" rows="2" spellcheck="false"></textarea></label>
+            <label>Total Δp [Pa]<textarea id="fcdp" rows="2" spellcheck="false"></textarea></label>
             <div style="display:grid;gap:8px"><label>Curve density [kg/m³]<input type="text" id="fcrho" inputmode="decimal"></label><label>Name<input type="text" id="fcname"></label></div>
           </div>
           <div class="chart" id="fcChart"><div class="ch"></div></div>
           <div id="fcOut"></div>
-          <div class="geo-foot" style="margin-top:8px"><button class="btn" type="button" id="fcEx">Load example curve</button></div>
+          <div class="geo-foot" style="margin-top:8px"><button class="btn" type="button" id="fcEx">Load example: BVN BTFM 1000</button></div>
         </div>
       </div>
     </div>
@@ -870,11 +901,12 @@ input[type=range]::-moz-range-thumb{width:12px;height:24px;border-radius:4px;bac
         <li>Bell &amp; Mehta (1988). Contraction design for small low-speed wind tunnels. NASA CR-182747.</li>
         <li>Bansmer et al. (2018). Braunschweig Icing Wind Tunnel. Atmos. Meas. Tech. 11.</li>
         <li>Langmuir &amp; Blodgett (1946); Anderson (2004), NASA/CR-2004-212875.</li>
+        <li>Olsen, Van Fossen &amp; Nussle (1987), NASA TM-100116; Newton &amp; Olsen (1986), NASA TM-87095 (iced coil and vanes).</li>
       </ol>
     </div>
     <div>
       <h4>Scope</h4>
-      <p>A one-dimensional preliminary design of a closed-circuit icing wind tunnel. The loss, fan and thermal logic is identical to the project's <span class="mono">kapali_devre_1D.m</span> v1.3; the audit rules and droplet impingement estimate are added on this page. It does not replace CFD, vendor data or calibration.</p>
+      <p>A one-dimensional preliminary design of a closed-circuit icing wind tunnel. The loss, fan, thermal, iced-loss and operating-cycle logic is identical to the project's <span class="mono">kapali_devre_1D.m</span> v1.6; the audit rules and droplet impingement estimate are added on this page. It does not replace CFD, vendor data or calibration.</p>
       <p><a href="https://github.com/kerimmyilmaaz/Lowspeedwindtunneldesign" target="_blank" rel="noopener">Project repository</a> · <a href="https://github.com/kerimmyilmaaz/Lowspeedwindtunneldesign/blob/main/LICENSE" target="_blank" rel="noopener">AGPL-3.0</a>. For commercial use or another licence, get in touch.</p>
     </div>
     <div>

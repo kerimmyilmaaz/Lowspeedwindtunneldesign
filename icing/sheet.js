@@ -144,8 +144,8 @@ async function exportSheet(ST,O,prog){
       for(let i=0;i<per;i++){ const lat=(-1+(2*i+1)/per)*sp.w/2*0.9; doc.circle(X(sp.x+sp.nx*lat),Y(sp.y+sp.ny*lat),0.35,'F'); } }
     doc.setDrawColor(C.muted); doc.setLineWidth(0.12);
     Hh.vanesAll().forEach(a=>poly(a.map(p=>[X(p[0]),Y(p[1])]),'S',false));
-    const fq=PT.byId.fan; if(fq){ const o=Hh.segAt(fq,fq.L*0.5), nc=R.fan.ncol; doc.setDrawColor(C.k.fan); doc.setLineWidth(0.7);
-      for(let i=0;i<nc;i++){ const lat=(-1+(2*i+1)/nc)*o.w/2, cx=o.x+o.nx*lat, cy=o.y+o.ny*lat; doc.line(X(cx+o.nx*G.fan.D/2),Y(cy+o.ny*G.fan.D/2),X(cx-o.nx*G.fan.D/2),Y(cy-o.ny*G.fan.D/2)); } }
+    const fq=PT.byId.fan; if(fq){ const o=Hh.segAt(fq,fq.L*0.5), hd=Math.min(G.fan.D,o.w)/2; doc.setDrawColor(C.k.fan); doc.setLineWidth(0.7);
+      doc.line(X(o.x+o.nx*hd),Y(o.y+o.ny*hd),X(o.x-o.nx*hd),Y(o.y-o.ny*hd)); }
     const x0=PT.x0+PT.sLE, c=PT.c, fp=[]; for(let i=0;i<=30;i++){ const xc=(1-Math.cos(Math.PI*i/30))/2; fp.push([X(x0+xc*c),Y(Hh.ythk(xc,Hh.TC)*c)]); }
     for(let i=30;i>=0;i--){ const xc=(1-Math.cos(Math.PI*i/30))/2; fp.push([X(x0+xc*c),Y(-Hh.ythk(xc,Hh.TC)*c)]); }
     doc.setFillColor(C.k.model); poly(fp,'F');
@@ -162,7 +162,7 @@ async function exportSheet(ST,O,prog){
       const xr=X(ex.x1)+3.5; doc.line(xr,Y(ex.y0),xr,Y(ex.y1)); doc.line(xr-1,Y(ex.y0),xr+1,Y(ex.y0)); doc.line(xr-1,Y(ex.y1),xr+1,Y(ex.y1)); T(nf(g.en,2)+' m',xr+1.4,(Y(ex.y0)+Y(ex.y1))/2+1);
       font(FS,'normal',5.8,C.muted);
       const lbl=(s,t,up)=>{ const o=Hh.pathAt(PT,s); T(t,X(o.x),up?Y(ex.y1)-1.6:Y(ex.y0)+2.6,{align:'center'}); };
-      const B=PT.byId; if(B.ts) lbl(B.ts.s0+B.ts.L/2,'test section'); if(B.dn) lbl(B.dn.s0+B.dn.L/2,'settling'); if(B.fan) lbl(B.fan.s0+B.fan.L/2,'fans',true);
+      const B=PT.byId; if(B.ts) lbl(B.ts.s0+B.ts.L/2,'test section'); if(B.dn) lbl(B.dn.s0+B.dn.L/2,'settling'); if(B.fan) lbl(B.fan.s0+B.fan.L/2,'fan',true);
     }
     return {k};
   }
@@ -176,7 +176,7 @@ async function exportSheet(ST,O,prog){
   head();
   font(FM,'normal',7,C.accent); T('TECHNICAL DATASHEET · CLOSED-CIRCUIT ICING WIND TUNNEL',M,y+2,{charSpace:0.25}); y+=11;
   font(FC,'bold',30,C.ink); const tl=doc.splitTextToSize(tx(O.name),W-2*M-52); doc.text(tl,M,y+2); y+=tl.length*11+1;
-  font(FS,'normal',9,C.muted); { const sl=doc.splitTextToSize(tx('Single-return (Göttingen) circuit · '+nf(P.a,0)+' × '+nf(P.a,0)+' cm closed test section · '+P.fN+' fans · heat exchanger '+(P.yer==='birlikte'?'at the wide-angle diffuser exit':'in leg 3–4')),W-2*M-54); doc.text(sl,M,y); y+=sl.length*4+4; }
+  font(FS,'normal',9,C.muted); { const sl=doc.splitTextToSize(tx('Single-return (Göttingen) circuit · '+nf(P.a,0)+' × '+nf(P.a,0)+' cm closed test section · single Ø'+nf(P.fD,0)+' cm fan'+(P.kap?' with hub fairing and straightener':'')+' · heat exchanger '+(P.yer==='birlikte'?'at the wide-angle diffuser exit':'in leg 3–4')),W-2*M-54); doc.text(sl,M,y); y+=sl.length*4+4; }
   /* serial plate */
   const plY=26, plX=W-M-48; doc.setDrawColor(C.ink); doc.setLineWidth(0.4); doc.rect(plX,plY,48,25);
   font(FS,'normal',5.6,C.muted); T('DESIGN ID',plX+3,plY+4.5,{charSpace:0.2}); font(FM,'bold',9.6,C.ink); T(id,plX+3,plY+10.5);
@@ -210,9 +210,9 @@ async function exportSheet(ST,O,prog){
   if(O.inc.geo!==false){
     prog(0.5,'Geometry…');
     head('Geometry','02');
-    para('Duct components along the centre line in flow direction, starting at the test-section inlet. Corner lengths are taken as the corner side. θe is the equivalent cone half-angle; wall angles are per wall in the horizontal (plan) and vertical planes.',7.2);
+    para('Duct components along the centre line in flow direction, starting at the test-section inlet. Corner lengths are taken as the corner side. θe is the equivalent cone half-angle, tan θe = (√A2 − √A1)/(√π L); wall angles are local, for the flat wall and for the diagonal plane (the round fan end is taken with its true diameter).',7.2);
     const cm=v=>nf(v*100,0), ang=v=>isFinite(v)?nf(v,1):'–';
-    table([{t:'#',w:8},{t:'Component',w:34},{t:'Leg',w:26},{t:'Inlet W×H [cm]',w:20,a:'r',m:1},{t:'Outlet W×H',w:19,a:'r',m:1},{t:'AR',w:10,a:'r',m:1},{t:'L [m]',w:11,a:'r',m:1},{t:'θe [°]',w:11,a:'r',m:1},{t:'plan/vert [°]',w:16,a:'r',m:1},{t:'V in/out [m/s]',w:22,a:'r',m:1},{t:'x [m]',w:8,a:'r',m:1}],
+    table([{t:'#',w:8},{t:'Component',w:34},{t:'Leg',w:26},{t:'Inlet W×H [cm]',w:20,a:'r',m:1},{t:'Outlet W×H',w:19,a:'r',m:1},{t:'AR',w:10,a:'r',m:1},{t:'L [m]',w:11,a:'r',m:1},{t:'θe [°]',w:11,a:'r',m:1},{t:'wall/diag [°]',w:16,a:'r',m:1},{t:'V in/out [m/s]',w:22,a:'r',m:1},{t:'x [m]',w:8,a:'r',m:1}],
       GT.map(r=>({c:[r.no,r.name,r.leg,cm(r.W1)+'×'+cm(r.H1),cm(r.W2)+'×'+cm(r.H2),nf(r.AR,2),nf(r.L,2),ang(r.thE),ang(r.thY)+'/'+ang(r.thD),nf(r.V1,1)+' / '+nf(r.V2,1),nf(r.x0,1)],sw:C.k[(PT.byId[r.id]||{key:'duct'}).key]})),{cont:'Geometry'});
     sub('Corner turning vanes');
     const kb=R.bil.filter(b=>b.tip==='kose');
@@ -226,7 +226,7 @@ async function exportSheet(ST,O,prog){
       ['Honeycomb','Position / cell D_h / depth',nf(P.xhc,0)+' cm · '+nf(P.hcD,0)+' mm · '+nf(P.hcL,0)+' mm (L/D '+nf(P.hcL/P.hcD,1)+')'],['','Porosity / cells (approx.)',nf(P.hcB,2)+' · '+ni((R.geo.s_dn/G.hc.Dh)**2)],
       ['Turbulence screens','Count / positions',P.elN+' · '+G.dn.x_el.map(v=>nf(v*100,0)).join(', ')+' cm'],['','Wire / mesh / open area',nf(P.eldw,2)+' / '+nf(P.elwm,2)+' mm · '+nf(25.4/P.elwm,0)+' mesh · β '+nf((1-P.eldw/P.elwm)**2,2)],
       ['Spray bars','Position / to contraction',nf(P.xsp,0)+' cm · '+nf(P.Ldn-P.xsp,0)+' cm'],['','Bars × Ø / pitch / nozzles',P.spN+' × '+nf(P.spd,0)+' mm · '+nf(R.geo.s_dn/Math.max(1,P.spN)*100,1)+' cm · '+P.spNn],
-      ['Fan array','Count / layout / Ø',P.fN+' · '+R.fan.ncol+'×'+R.fan.nrow+' · '+nf(P.fD,0)+' cm'],['','Section / module length',nf(P.fw,0)+' × '+nf(P.fh,0)+' cm · '+nf(P.Lfan,0)+' cm'],
+      ['Fan','Diameter / casing length','Ø'+nf(P.fD,0)+' cm round · '+nf(P.Lfan,0)+' cm · transition '+nf(P.Lgec,0)+' cm'],['','Hub fairing + straightener',P.kap?nf(P.nuk,2)+' D hub · '+nf(P.Lkap,1)+' cm + closure '+nf(P.Lkapn,1)+' cm · K '+nf(P.Kduz,2):'none'],
       ['Model','Chord × span / LE position',nf(P.mc,0)+' × '+nf(P.a,0)+' cm · '+nf(P.mx,0)+' cm from TS inlet'],
       ['Circuit','Width H / long-leg corner pitch',nf(R.geo.H,2)+' m · '+nf(R.geo.X_alt,2)+' m'],['','Insulation',nf(P.it,0)+' mm · k = '+nf(P.ik,3)+' W/mK']];
     table([{t:'Element',w:34},{t:'Property',w:52},{t:'Value',w:94}],E.map(e=>({c:e,b:false,col:C.ink})),{cont:'Geometry'});
@@ -246,9 +246,9 @@ async function exportSheet(ST,O,prog){
       .concat([{c:['Sum of components','','','',nf(R.K_ham,4),nf(R.K_ham*R.q_TS,1),'100%',''],b:true,hl:true},{c:['Circuit total, leakage ×'+nf(P.leak,2),'','','',nf(R.K_top,4),nf(R.dp_top,1),'',''],b:true,hl:true}]),{cont:'Aerodynamics'});
     sub('Fan duty and power');
     kvGrid([['Fan Δp, duct to duct',nf(R.dp_top,0),'Pa',true],['Selection (×'+nf(P.marg,2)+')',nf(R.dp_top*P.marg,0),'Pa',true],['Air power Δp·Q',kW(R.P_hava).v,kW(R.P_hava).u],['Shaft power',kW(R.P_mil).v,kW(R.P_mil).u+' · η '+nf(P.etaf,2)],
-      ['Electrical power',kW(R.P_elek).v,kW(R.P_elek).u+' · η_m '+nf(P.etam,2)],['Jet power ½ρV³A',kW(R.P_jet).v,kW(R.P_jet).u],['Energy ratio',nf(R.ER,2),'λ = '+nf(R.lambda,2)],['Per-fan flow',ni(3600*R.fan.q_tek),'m³/h'],
-      ['Est. speed',ni(R.fan.n_rpm),'rpm · ψ '+nf(P.psi,2)],['Tip speed',nf(R.fan.U_uc,1),'m/s · M '+nf(R.fan.M_uc,2)],['Outlet velocity',nf(R.fan.V_cikis,1),'m/s · '+nf(R.fan.oran*100,0)+'% cover'],['Alt. HX layout Δp',nf(ST.Ralt.dp_top,0),'Pa ('+(P.yer==='ayri'?'at WAD exit':'in leg 3–4')+')']],4,{h:12.5,big:11.5});
-    if(FCv){ para('Manufacturer curve "'+(P.fcname||'fan')+'" ('+P.fN+' in parallel, scaled to '+nf(R.rho,3)+' kg/m³): operating point '+nf(FCv.Q_cn,2)+' m³/s at '+nf(FCv.dp_cn,0)+' Pa, i.e. '+nf(FCv.V_cn,1)+' m/s in the test section (target '+nf(R.V,0)+' m/s).',7.2,C.ink); }
+      ['Electrical power',kW(R.P_elek).v,kW(R.P_elek).u+' · η_m '+nf(P.etam,2)],['Jet power ½ρV³A',kW(R.P_jet).v,kW(R.P_jet).u],['Energy ratio',nf(R.ER,2),'λ = '+nf(R.lambda,2)],['Iced Δp (λ_fan '+nf(P.lamF,2)+')',ni(R.dp_top*P.lamF),'Pa'],
+      ['Est. speed',ni(R.fan.n_rpm),'rpm · ψ '+nf(P.psi,2)],['Tip speed',nf(R.fan.U_uc,1),'m/s · M '+nf(R.fan.M_uc,2)],['Fan section velocity',nf(R.fan.V_sec,1),'m/s'],['Alt. HX layout Δp',nf(ST.Ralt.dp_top,0),'Pa ('+(P.yer==='ayri'?'at WAD exit':'in leg 3–4')+')']],4,{h:12.5,big:11.5});
+    if(FCv){ para('Manufacturer curve "'+(P.fcname||'fan')+'" (scaled to '+nf(R.rho,3)+' kg/m³): operating point '+nf(FCv.Q_cn,2)+' m³/s at '+nf(FCv.dp_cn,0)+' Pa, i.e. '+nf(FCv.V_cn,1)+' m/s in the test section (target '+nf(R.V,0)+' m/s).',7.2,C.ink); }
     /* pressure loop chart */
     need(70);
     const fi=R.bil.findIndex(b=>b.id==='borda')>=0?R.bil.findIndex(b=>b.id==='borda'):R.bil.findIndex(b=>b.id==='fan'), seq=R.bil.slice(fi+1).concat(R.bil.slice(0,fi+1));
@@ -271,16 +271,16 @@ async function exportSheet(ST,O,prog){
     head('Thermal budget and icing cloud','04');
     para('In a closed loop all fan shaft power becomes heat in the air. Wall heat follows from U = 1/(1/h_i + t/k + 1/h_o) over the wetted wall area; the spray water is cooled from the nozzle temperature, frozen and sub-cooled to the air temperature. kapali_devre_1D.m §6–7.',7.2);
     const rw=(l,a,b)=>({c:[l,a,b]});
-    table([{t:'Heat load',w:80},{t:nf(P.V,0)+' m/s · '+nf(P.LWC,1)+' g/m³',w:50,a:'r',m:1},{t:nf(P.Vs,0)+' m/s · '+nf(P.LWCs,1)+' g/m³ (continuous)',w:50,a:'r',m:1}],[
-      rw('Fan shaft power',nf(TB.fan/1000,2)+' kW',nf(TBs.fan/1000,2)+' kW'),rw('Motor losses'+(P.motorIn?' (motors in the stream)':' (outside)'),nf(TB.motor/1000,2)+' kW',nf(TBs.motor/1000,2)+' kW'),
+    table([{t:'Heat load',w:80},{t:'S2 · '+nf(P.V,0)+' m/s · '+nf(P.LWC,1)+' g/m³',w:50,a:'r',m:1},{t:'S1 · '+nf(P.Vs,0)+' m/s · '+nf(P.LWCs,1)+' g/m³',w:50,a:'r',m:1}],[
+      rw('Fan shaft power',nf(TB.fan/1000,2)+' kW',nf(TBs.fan/1000,2)+' kW'),rw('Motor losses'+(P.motorIn?' (motor in the stream)':' (outside)'),nf(TB.motor/1000,2)+' kW',nf(TBs.motor/1000,2)+' kW'),
       rw('Wall heat gain (lab '+nf(P.Tlab,0)+' °C, U '+nf(TB.U,3)+' W/m²K, '+nf(R.A_duvar,1)+' m²)',nf(TB.duvar/1000,2)+' kW',nf(TBs.duvar/1000,2)+' kW'),
       rw('Spray water, sensible + latent ('+nf(TB.m_su*3600,1)+' kg/h)',nf(TB.sprey/1000,2)+' kW',nf(TBs.sprey/1000,2)+' kW'),
       Object.assign(rw('Total',nf(TB.top/1000,2)+' kW',nf(TBs.top/1000,2)+' kW'),{b:true}),Object.assign(rw('Refrigeration selection (×'+nf(P.tmarg,2)+')',nf(TB.sec/1000,2)+' kW',nf(TBs.sec/1000,2)+' kW'),{b:true,hl:true})]);
     /* stacked bar */
     need(14); const parts=[['fan',C.k.fan],['motor',C.k.model],['duvar',C.k.duct],['sprey',C.k.hx]], mx=Math.max(TB.sec,TBs.sec);
-    [[TB,'design'],[TBs,'continuous']].forEach(([t,l])=>{ let x=M+24; font(FS,'normal',6.4,C.muted); T(l,M,y+2.6); parts.forEach(p=>{ const w=t[p[0]]/mx*(W-2*M-40); doc.setFillColor(p[1]); doc.rect(x,y,w,3.6,'F'); x+=w; }); doc.setDrawColor(C.muted); doc.setLineDashPattern([0.6,0.6],0); doc.rect(x,y,(t.sec-t.top)/mx*(W-2*M-40),3.6,'S'); doc.setLineDashPattern([],0); font(FM,'normal',6.4,C.ink); T(nf(t.sec/1000,2)+' kW',W-M,y+2.8,{align:'right'}); y+=5.6; });
+    [[TB,'S2 design'],[TBs,'S1']].forEach(([t,l])=>{ let x=M+24; font(FS,'normal',6.4,C.muted); T(l,M,y+2.6); parts.forEach(p=>{ const w=t[p[0]]/mx*(W-2*M-40); doc.setFillColor(p[1]); doc.rect(x,y,w,3.6,'F'); x+=w; }); doc.setDrawColor(C.muted); doc.setLineDashPattern([0.6,0.6],0); doc.rect(x,y,(t.sec-t.top)/mx*(W-2*M-40),3.6,'S'); doc.setLineDashPattern([],0); font(FM,'normal',6.4,C.ink); T(nf(t.sec/1000,2)+' kW',W-M,y+2.8,{align:'right'}); y+=5.6; });
     font(FS,'normal',5.8,C.muted); let lx=M+24; [['fan','fan shaft',C.k.fan],['motor','motor',C.k.model],['duvar','walls',C.k.duct],['sprey','spray water',C.k.hx]].forEach(p=>{ doc.setFillColor(p[2]); doc.rect(lx,y-2,2,2,'F'); T(p[1],lx+3,y-0.2); lx+=26; }); y+=5;
-    para('Evaporating temperature for this duty is about '+nf(IC.Tevap,0)+' °C (Bansmer et al. 2018: −32 °C refrigerant for −20 °C air). Catalogue capacities are rated much warmer; ask for capacity at the actual evaporating temperature.',7);
+    para('The secondary fluid runs about '+nf(P.dTy,0)+' K below the air, near '+nf(IC.Tevap,0)+' °C (Bansmer et al. 2018: −32 °C fluid for −20 °C air), and the refrigerant evaporates lower still'+(IC.Tevap<-40?'; a single-stage unit does not reach this, a two-stage or cascade unit is needed':'')+'. Ask for capacity at the actual evaporating temperature.',7);
     sub('Icing cloud at the model');
     kvGrid([['LWC · MVD',nf(P.LWC,2)+' · '+nf(P.MVD,0),'g/m³ · µm',true],['Spray water',nf(IC.water_Lh,1),'L/h · '+nf(IC.perNoz,2)+' per nozzle',true],['Stagnation β₀',nf(IC.beta0,2),'K₀ '+nf(IC.K0,2)],['Ice growth (rime)',nf(IC.rate_mm_min,2),'mm/min'],
       ['Total temperature',nf(IC.Tstag,1),'°C'],['Regime (rule of thumb)',IC.regime==='none'?'no ice':IC.regime,''],['Spray → LE time',nf(R.t_kalis*1000,0),'ms'],['LE diameter (t/c 0.12)',nf(IC.dLE*1000,1),'mm']],4,{h:12.5,big:11.5});
@@ -293,6 +293,23 @@ async function exportSheet(ST,O,prog){
     table([{t:'V [m/s] \\ LWC [g/m³]',w:36,m:1}].concat(lw.map(v=>({t:String(v),w:24,a:'r',m:1}))),[20,30,40].concat([P.V]).filter((v,i,a)=>a.indexOf(v)===i).sort((a,b)=>a-b).map(V=>({c:[nf(V,0)].concat(lw.map(L=>nf(L*1e-3*V*R.A_TS*3600,2))),hl:V===P.V})));
     sub('Outer-skin condensation');
     para('Outer skin '+nf(IC.Tskin,1)+' °C against a lab dew point of '+nf(IC.Tdew,1)+' °C ('+nf(P.RH,0)+'% RH at '+nf(P.Tlab,0)+' °C, Magnus form after Alduchov & Eskridge 1996); wall heat flux '+nf(IC.qwall,1)+' W/m². '+(IC.Tskin<IC.Tdew?'Condensation expected on the outside of the duct.':'The skin stays dry.'),7.2,C.ink);
+    /* v1.6: icing scenarios, fan requirement and operating cycle */
+    const SNs=ST.SN, ICE=ST.ICE, FRq=ST.FR, OPS=ST.OPS, mn=v=>isFinite(v)?nf(v/60,v<600?1:0):'–';
+    sub('Icing scenarios: circuit loss once ice builds up (λ = Δp / Δp design)');
+    table([{t:'State',w:62}].concat(SNs.map(sn=>[{t:'K '+sn.id,w:18,a:'r',m:1},{t:'Δp [Pa]',w:16,a:'r',m:1},{t:'λ',w:12,a:'r',m:1},{t:'kW',w:11,a:'r',m:1}]).reduce((a,b)=>a.concat(b),[])),
+      ICE[0].map((row,i)=>({c:[row.name+(row.refs.length?' ['+row.refs.join('][')+']':'')].concat(ICE.map(L=>[nf(L[i].K,4),ni(L[i].dp),nf(L[i].lam,2),nf(L[i].P/1000,1)]).reduce((a,b)=>a.concat(b),[])),hl:!ICE.every(L=>L[i].ok)})),{cont:'Icing scenarios'});
+    para('Literature factors: coil Δp ×'+nf(P.bzHx,1)+' (NASA TM-100116), corner-1 vanes ×'+nf(P.bzC1,1)+' (NASA TM-87095), diffuser stall behind a 2D model power ×'+nf(P.bzSt,1)+' (Barlow p.101). Highlighted rows exceed the fan icing margin λ_fan = '+nf(P.lamF,2)+'.',6.8);
+    sub('Fan requirement (brand-independent)');
+    table([{t:'',w:60}].concat(FRq.map(r=>({t:r.name,w:60,a:'r',m:1}))),[
+      ['Air temperature / density',r=>nf(r.Tc,0)+' °C / '+nf(r.rho,3)+' kg/m³'],['Flow',r=>ni(r.Q*3600)+' m³/h'],
+      ['Total pressure rise, clean / iced',r=>ni(r.dp0)+' / '+ni(r.dpL)+' Pa'],['Shaft power, clean / iced',r=>nf(r.Pm0/1000,1)+' / '+nf(r.PmL/1000,1)+' kW'],
+      ['Suggested motor (1.15 × iced shaft)',r=>nf(r.motor/1000,1)+' kW'],['Velocity in the fan section',r=>nf(r.Vfan,1)+' m/s']].map(([l,f])=>({c:[l].concat(FRq.map(f))})));
+    sub('Operating cycle (lumped thermal mass)');
+    table([{t:'LWC [g/m³]',w:20,m:1}].concat(SNs.map(sn=>[{t:sn.id+' run nom./worst [min]',w:34,a:'r',m:1},{t:'cycle A / B [min]',w:26,a:'r',m:1},{t:'runs/day A · B',w:20,a:'r',m:1}]).reduce((a,b)=>a.concat(b),[])),
+      G.ops.LWC.map((L,i)=>({c:[nf(L,2)].concat(SNs.map((sn,j)=>{ const r=OPS.run[j][i], c=OPS.cyc[j][i]; return [mn(r.nom.t)+' / '+mn(r.worst.t),(isFinite(c.cA)?nf(c.cA,0):'–')+' / '+(isFinite(c.cB)?nf(c.cB,0):'–'),c.nA+' · '+c.nB]; }).reduce((a,b)=>a.concat(b),[])),hl:Math.abs(L-P.LWC)<1e-9})));
+    { const c0=OPS.cool[SNs.length-1].find(c=>Math.abs(c.Qk-OPS.Qk)<1);
+      para('C = '+nf(OPS.C/1e6,2)+' MJ/K, UA = '+nf(OPS.UA,0)+' W/K, refrigeration '+nf(OPS.Qk/1000,0)+' kW: first cool-down from '+nf(P.Tlab,0)+' °C '+(c0&&c0.ok?mn(c0.t)+' min':'not reached')+'. A run ends when the circuit loss reaches λ_fan, the coil blocks to b = '+nf(P.bmax,2)+', the air drifts '+nf(P.dTa,1)+' K, or at 120 min. '+
+        'Nominal: the coil catches '+nf(P.fsu*100,0)+'% of the spray water; worst: all of it, with corner 1 at ×'+nf(P.bzC1,1)+'. Cycle = 10 min spray + de-icing (A: whole tunnel to +5 °C, B: coil defrost only) + drain + re-cooling + 15 min set-up. Masses and refrigeration are estimates.',6.8); }
   }
 
   /* ================= 5. sweep ================= */
