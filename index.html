@@ -342,6 +342,38 @@ h2{font-family:var(--f-display);font-stretch:118%;font-weight:800;font-size:clam
 .seg{display:flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;margin:4px 0 8px}
 .seg button{flex:1;border:0;background:transparent;color:var(--muted);font:500 13px var(--f-body);padding:7px 8px;cursor:pointer}
 .seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+/* designer */
+.dz{display:grid;gap:22px}
+.dz-req{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
+.dz-q{margin-top:10px;border-top:1px dashed var(--line);padding-top:10px}
+.dz-q .seg{margin:6px 0 6px}
+.dz-ql{font-size:13.5px}
+.dz-q p,.dz-note{margin:0;font-size:12.5px;color:var(--muted);line-height:1.45}
+.dz-note{margin-top:10px}
+.dz-note button{font:inherit;color:var(--accent);background:none;border:0;padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.dz-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.dz-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px 16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.dz-card.rec{border-color:var(--accent)}
+.dz-card h3{margin:0;font-size:16px;font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.dz-card .tag{font:600 10px var(--f-mono);letter-spacing:.07em;text-transform:uppercase;color:var(--accent);border:1px solid var(--accent);border-radius:999px;padding:2px 8px}
+.dz-card header p{margin:3px 0 0;font-size:12.5px;color:var(--muted)}
+.dz-card svg{width:100%;height:auto;display:block;overflow:visible}
+.dz-kv{margin:0;display:grid;grid-template-columns:auto minmax(0,1fr);gap:5px 12px;font-size:13px;align-items:baseline}
+.dz-kv dt{color:var(--muted)}
+.dz-kv dd{margin:0;text-align:right;font-family:var(--f-mono);font-size:12.5px;color:var(--ink)}
+.dz-kv dd small{color:var(--muted);font-size:11px}
+.dz-kv .key{color:var(--accent);font-weight:600}
+.dz-flag{margin:0;font-size:12.5px;color:var(--muted);display:flex;gap:7px;align-items:baseline}
+.dz-flag::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--ok);flex:none;transform:translateY(-1px)}
+.dz-flag.near::before{background:transparent;box-shadow:inset 0 0 0 2px var(--warn)}
+.dz-card .btn{margin-top:auto}
+.dz-card .btn[aria-pressed="true"]{background:transparent;color:var(--ink);border-color:var(--ok)}
+.dz-msg{border:1px solid var(--warn);border-radius:12px;padding:14px 16px;background:var(--surface)}
+.dz-msg h3{margin:0 0 6px;font-size:15px;font-weight:600}
+.dz-msg ul{margin:0;padding-left:18px;font-size:13.5px}
+.dz-msg li{margin:3px 0}
+.dz-sug{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.dz-out .errbox{margin-top:0}
 .geo-foot{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:16px}
 .btn{font:600 13.5px var(--f-body);border-radius:7px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:9px 14px;cursor:pointer;transition:border-color .2s,transform .35s var(--ease)}
 .btn:hover{border-color:var(--ink)}
@@ -458,6 +490,7 @@ input[type=range]::-moz-range-thumb{width:12px;height:24px;border-radius:4px;bac
   .bp{position:relative;top:0}
 }
 @media (max-width:900px){
+  .dz-req,.dz-cards{grid-template-columns:1fr}
   .hero-head{grid-template-columns:1fr}
   .budget,.charts{grid-template-columns:1fr}
   footer{grid-template-columns:1fr}
@@ -513,12 +546,12 @@ input[type=range]::-moz-range-thumb{width:12px;height:24px;border-radius:4px;bac
     <header class="top">
       <div class="mark"><span class="wm">SMOKE<em>LINE</em></span><div class="cswitch" role="tablist" aria-label="Tunnel type" data-on="open"><a role="tab" href="./" data-circuit="open" aria-selected="true"><svg viewBox="0 0 22 12" aria-hidden="true"><path d="M1 2h5l4 3h4l7-3M1 10h5l4-3h4l7 3"/></svg><span class="cs-t">Open circuit</span></a><a role="tab" href="#icing" data-circuit="closed" aria-selected="false"><svg viewBox="0 0 22 12" aria-hidden="true"><rect x="1" y="1" width="20" height="10" rx="2.5"/><path d="M6 6h10"/></svg><span class="cs-t">Closed · Icing</span></a><span class="cs-ind" aria-hidden="true"></span></div><span class="ver">OPEN CIRCUIT · CLOSED TEST SECTION · 1D SIZING</span></div>
       <nav class="jump" aria-label="Sections">
-        <a href="#fly" data-go="fly">Fly-through</a><a href="#loss" data-go="loss">Loss budget</a><a href="#geometry" data-go="geometry">Geometry</a><a href="#notebook" data-go="notebook">Notebook</a><a href="#sweep" data-go="sweep">Speed sweep</a><a href="#matlab" data-go="matlab">MATLAB</a><a href="#contact">Contact</a>
+        <a href="#fly" data-go="fly">Fly-through</a><a href="#design" data-go="design">Designer</a><a href="#loss" data-go="loss">Loss budget</a><a href="#geometry" data-go="geometry">Geometry</a><a href="#notebook" data-go="notebook">Notebook</a><a href="#sweep" data-go="sweep">Speed sweep</a><a href="#matlab" data-go="matlab">MATLAB</a><a href="#contact">Contact</a>
       </nav>
     </header>
     <div class="hero-head" id="heroHead">
       <h1 id="h1"><span class="w-in">Contract.</span><span class="w-ex">Accelerate.</span><span class="w-mid">Read the loss.</span></h1>
-      <p class="lede">A live <b>wind tunnel computation sheet</b> for a <b>low-speed, open-circuit wind tunnel</b>. Enter your geometry and drag the throttle. Smoke filaments speed up and slow down as continuity dictates, and every component loss is recomputed from the Barlow, Rae &amp; Pope (1999) relations. Scroll on to fly through the tunnel.</p>
+      <p class="lede">A live <b>wind tunnel computation sheet</b> for a <b>low-speed, open-circuit wind tunnel</b>. Enter your geometry and drag the throttle. Smoke filaments speed up and slow down as continuity dictates, and every component loss is recomputed from the Barlow, Rae &amp; Pope (1999) relations. Scroll on to fly through the tunnel, or <a href="#design" data-go="design">design one from your requirements</a>.</p>
     </div>
     <div class="tunnel" id="tunnel">
       <canvas class="cvB" aria-hidden="true"></canvas>
@@ -558,6 +591,18 @@ input[type=range]::-moz-range-thumb{width:12px;height:24px;border-radius:4px;bac
 </section>
 
 <div class="wrap">
+  <section class="blk" id="design" aria-labelledby="h-design">
+    <div class="shead"><div class="secno" aria-hidden="true">00</div><div>
+      <p class="eyebrow">Inverse design · requirements → geometry</p>
+      <h2 id="h-design" class="rv split">Design from requirements</h2>
+      <p class="sub rv" style="--i:2">Give the test section, the top speed and the flow quality you need, plus any limits set by your room or your fan. The designer sizes the contraction and the diffuser from the literature rules, runs every candidate through the same calculation as this sheet and offers three designs. Load one, then fine-tune it below.</p>
+    </div></div>
+    <div class="dz">
+      <div class="dz-req rv" id="dzReq" style="--i:1"></div>
+      <div class="dz-out" id="dzOut" aria-live="polite"></div>
+    </div>
+  </section>
+
   <section class="blk" id="loss" aria-labelledby="h-loss">
     <div class="shead"><div class="secno" aria-hidden="true">12</div><div>
       <p class="eyebrow">MATLAB §12 · pressure loss summary</p>
@@ -638,6 +683,8 @@ input[type=range]::-moz-range-thumb{width:12px;height:24px;border-radius:4px;bac
       <ol>
         <li>Barlow, J. B., Rae, W. H., Pope, A. (1999). <i>Low-Speed Wind Tunnel Testing</i>, 3rd ed. Wiley. Eq. 3.14, 3.24–3.27, 3.36–3.43; §3.3, §3.5.</li>
         <li>Eckert, W. T., Mort, K. W., Jope, J. (1976). <i>Aerodynamic Design Guidelines and Computer Program for Estimation of Subsonic Wind Tunnel Performance</i>. NASA TN D-8243, App. B (diffuser expansion loss K<sub>e</sub>).</li>
+        <li>Mehta, R. D., Bradshaw, P. (1979). Design rules for small low speed wind tunnels. <i>Aeronautical Journal</i> 83, 443–449 (contraction ratio, screens).</li>
+        <li>Bell, J. H., Mehta, R. D. (1988). Contraction design for small low-speed wind tunnels. NASA CR-182747 (contraction length).</li>
         <li>Wattendorf contraction loss relation, as given in Barlow, Rae &amp; Pope.</li>
         <li>Haaland, S. E. (1983). Explicit friction factor approximation, smooth-wall form.</li>
         <li>Sutherland's law for viscosity; Maskell, E. C. (1963), solid blockage criterion.</li>
@@ -1799,7 +1846,7 @@ function buildGeo(){
 }
 function syncInputs(){
   FIELDS.forEach(f=>{ const inp=$('#in-'+f.k); if(document.activeElement!==inp) inp.value=showNum(P[f.k]); });
-  document.querySelectorAll('.seg button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mode===P.mode)));
+  document.querySelectorAll('#geo .seg button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mode===P.mode)));
   document.querySelectorAll('[data-manual]').forEach(el=>el.hidden=P.mode!=='manual');
   syncDock();
 }
@@ -2607,7 +2654,7 @@ function gust(name,eyebrow,action,pal){
 }
 
 /* ================= chapters + rail ================= */
-const CH=[{id:'top',name:'Tunnel'},{id:'fly',name:'Fly-through'},{id:'loss',name:'Loss budget'},{id:'geometry',name:'Geometry'},{id:'notebook',name:'Notebook'},{id:'sweep',name:'Speed sweep'},{id:'matlab',name:'Export to MATLAB'}];
+const CH=[{id:'top',name:'Tunnel'},{id:'fly',name:'Fly-through'},{id:'design',name:'Designer'},{id:'loss',name:'Loss budget'},{id:'geometry',name:'Geometry'},{id:'notebook',name:'Notebook'},{id:'sweep',name:'Speed sweep'},{id:'matlab',name:'Export to MATLAB'}];
 let STX=[];
 function railH(){ return $('#rail').offsetHeight||50; }
 function jumpTo(id){
@@ -2639,7 +2686,7 @@ function buildRail(){
   let tp='',bt=''; const n=120;
   for(let i=0;i<=n;i++){ const x=len*i/n, h=TG.at(Math.min(x,len-1e-6)).h; tp+=(i?'L':'M')+(x/len*1000).toFixed(1)+','+(16-h/2*k).toFixed(2); bt+=(i?'L':'M')+(x/len*1000).toFixed(1)+','+(16+h/2*k).toFixed(2); }
   $('#railSvg').innerHTML='<path d="'+tp+'" fill="none" stroke="#8695A4" stroke-width="1" vector-effect="non-scaling-stroke"/><path d="'+bt+'" fill="none" stroke="#8695A4" stroke-width="1" vector-effect="non-scaling-stroke"/>';
-  STX=[0.012*len,TG.Ls*0.5,TG.x1+P.Ln*0.5,TG.x2+P.tL*0.5,TG.x3+P.Ld*0.22,TG.x3+P.Ld*0.62,len*0.988].map(x=>x/len*100);
+  STX=[0.012*len,TG.Ls*0.5,TG.x1,TG.x1+P.Ln*0.5,TG.x2+P.tL*0.5,TG.x3+P.Ld*0.22,TG.x3+P.Ld*0.62,len*0.988].map(x=>x/len*100);
   const tr=$('#railTrack'); tr.querySelectorAll('.r-st').forEach(b=>b.remove());
   CH.forEach((c,i)=>{ const b=document.createElement('button'); b.className='r-st'; b.type='button'; b.dataset.go=c.id; b.style.left=STX[i]+'%'; b.setAttribute('aria-label',c.name); b.innerHTML='<span>'+c.name+'</span>'; tr.appendChild(b); });
 }
@@ -2772,7 +2819,7 @@ function update(){
     layoutHero(); layoutFly(); buildRail();
   }
   if(RM.matches&&HV.L.W){ if(HV.gl) HV.gl.draw(HV.L,simT,HV.L.small?15:24); else HV.fb.still(HV); }
-  clearTimeout(slowT); slowT=setTimeout(()=>{ renderSweep(R); renderMatlab(); blueprint(); },120);
+  clearTimeout(slowT); slowT=setTimeout(()=>{ renderSweep(R); renderMatlab(); blueprint(); dzBaseChanged(); dzMarkLoaded(); },120);
   lastScroll=-1;
 }
 $('#btnReset').addEventListener('click',()=>{ P=defaults(); syncInputs(); FIELDS.forEach(f=>$('#in-'+f.k).parentNode.classList.remove('bad')); schedule(); });
@@ -2781,13 +2828,218 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{ if(R)
 new MutationObserver(()=>{ if(R) renderSweep(R); }).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 let rw=0, rh=0; new ResizeObserver(()=>{ const w=innerWidth, h=innerHeight; measureDock(); if(w!==rw||Math.abs(h-rh)>120){ rw=w; rh=h; if(TG){ layoutHero(); layoutFly(); } if(R){ renderSweep(R); blueprint(); } lastScroll=-1; } }).observe(document.body);
 
+/* ================= designer: requirements → geometry =================
+   The inverse of the sheet. The user states what the tunnel must do; every candidate geometry is
+   built from the literature rules and evaluated with the same compute() as the sheet:
+   · contraction ratio CR and number of screens from the flow-quality class (Mehta & Bradshaw 1979:
+     CR 6–9 for small tunnels, more screens for lower turbulence; the sheet's own check is 6–10),
+   · inlet keeps the test-section aspect ratio, contraction length L = k·H_in with k ≈ 0.9–1.25
+     (Bell & Mehta 1988),
+   · diffuser equivalent cone angle θe ≤ 3° (Barlow p. 81), 3–3.5° only for the compact option,
+     length solved from tan θe = (√AR − 1)/2 · D_h/L.
+   Air, fan efficiency, honeycomb, screen mesh and model come from the sheet. */
+const QUAL={
+  basic:{name:'Basic',use:'Teaching and smoke visualisation',cr:[6,7],N:2},
+  std:{name:'Standard',use:'General model testing',cr:[7,9],N:3},
+  low:{name:'Low turbulence',use:'Boundary-layer and transition work',cr:[9,10],N:4}
+};
+const QORD=['basic','std','low'];
+const DZF=[
+ {k:'tw',g:'need',label:'Test section width W',unit:'cm'},
+ {k:'th',g:'need',label:'Test section height H',unit:'cm'},
+ {k:'tL',g:'need',label:'Test section length L',unit:'cm'},
+ {k:'V',g:'need',label:'Top speed',unit:'m/s'},
+ {k:'maxL',g:'lim',label:'Overall length',hint:'e.g. the room length',unit:'cm',opt:true},
+ {k:'maxD',g:'lim',label:'Largest cross-section',hint:'inlet side or fan Ø',unit:'cm',opt:true},
+ {k:'maxP',g:'lim',label:'Fan power',hint:'shaft power at top speed',unit:'kW',opt:true},
+ {k:'fanD',g:'lim',label:'Fan diameter',hint:'if you already have the fan',unit:'cm',opt:true},
+];
+const LSQ='smokeline.req.v1';
+let REQ={tw:P.tw,th:P.th,tL:P.tL,V:P.V,qual:'std',maxL:'',maxD:'',maxP:'',fanD:''};
+try{ const s=JSON.parse(localStorage.getItem(LSQ)||'null'); if(s&&typeof s==='object') for(const k in REQ) if(k in s) REQ[k]=s[k]; }catch(_){}
+if(!QUAL[REQ.qual]) REQ.qual='std';
+function dzSave(){ try{ localStorage.setItem(LSQ,JSON.stringify(REQ)); }catch(_){} }
+let DZ=null, dzT=0;
+
+const dzLim=v=>v===''?Infinity:v;
+const dzSettle=nh=>Math.max(nh*0.8,10);      /* same schematic settling length as the drawing */
+function dzErrors(q){
+  const e=[], lab=k=>DZF.find(f=>f.k===k).label;
+  ['tw','th','tL','V'].forEach(k=>{ if(!(isFinite(q[k])&&q[k]>0)) e.push(lab(k)+' must be a positive number.'); });
+  ['maxL','maxD','maxP','fanD'].forEach(k=>{ if(q[k]!==''&&!(isFinite(q[k])&&q[k]>0)) e.push(lab(k)+' must be positive, or leave it empty.'); });
+  return e;
+}
+function dzEval(q,base,cr,k,thT,AR){
+  const A=q.tw*q.th, sc=Math.sqrt(cr), nw=Math.round(q.tw*sc), nh=Math.round(q.th*sc), Ln=Math.round(k*nh);
+  const Dd=q.fanD!==''?q.fanD:Math.round(2*Math.sqrt(AR*A/Math.PI));
+  const ARr=Math.PI*(Dd/2)**2/A; if(ARr<=1.05) return null;
+  const Dh=2*q.tw*q.th/(q.tw+q.th);
+  const Ld=Math.ceil(0.5*(Math.sqrt(ARr)-1)*Dh/Math.tan(thT*Math.PI/180));
+  const patch={V:q.V,tw:q.tw,th:q.th,tL:q.tL,nw,nh,Ln,Ld,Dd,N:QUAL[q.qual].N};
+  const p=Object.assign({},base,patch); if(validate(p).length) return null;
+  const r=compute(p);
+  return {patch,r,k,Ltot:dzSettle(nh)+Ln+q.tL+Ld,Dmax:Math.max(nw,nh,Dd),Pfan:r.Pfan};
+}
+function dzSolve(q,base){
+  const Q=QUAL[q.qual], all=[], ARs=[], ths=[], crs=[];
+  if(q.fanD!=='') ARs.push(0); else for(let a=1.5;a<=5.0001;a+=0.1) ARs.push(a);
+  for(let t=2;t<=3.5001;t+=0.25) ths.push(t);
+  for(let c=Q.cr[0];c<=Q.cr[1]+1e-9;c+=0.25) crs.push(c);
+  [0.9,1.0].forEach(k=>crs.forEach(cr=>ths.forEach(t=>ARs.forEach(AR=>{ const d=dzEval(q,base,cr,k,t,AR); if(d) all.push(d); }))));
+  const Lm=dzLim(q.maxL), Dm=dzLim(q.maxD), Pm=dzLim(q.maxP)*1000;
+  const fits=d=>d.r.M<0.3&&d.Ltot<=Lm&&d.Dmax<=Dm&&d.Pfan<=Pm;
+  const pick=(f,score)=>{ let b=null,bs=Infinity; all.forEach(d=>{ if(!f(d)||!fits(d)) return; const v=score(d); if(v<bs-1e-9){ bs=v; b=d; } }); return b; };
+  const strict=d=>d.k===1&&d.r.thd<=3.0001;
+  const compact=pick(d=>d.k===0.9,d=>d.Ltot+d.Pfan*1e-6);
+  const efficient=pick(strict,d=>d.Pfan+d.Ltot*1e-6);
+  let balanced=null;
+  if(efficient){ const S=all.filter(d=>strict(d)&&fits(d)), L0=Math.min(...S.map(d=>d.Ltot)), P0=efficient.Pfan;
+    balanced=pick(strict,d=>d.Ltot/L0+d.Pfan/P0); }
+  const mins=all.length?{L:Math.min(...all.map(d=>d.Ltot)),D:Math.min(...all.map(d=>d.Dmax)),P:Math.min(...all.map(d=>d.Pfan))}:null;
+  return {all:all.length,compact,balanced,efficient,mins};
+}
+function dzRun(q,base){
+  const a=Math.sqrt(1.4*287.058*(base.T+273.15)), Vmax=Math.floor(0.299*a);
+  if(q.V/a>=0.3) return {mach:true,Vmax,sugg:[{label:'Top speed → '+Vmax+' m/s',patch:{V:Vmax}}]};
+  const S=dzSolve(q,base);
+  const cards=[];
+  if(S.compact) cards.push(Object.assign({id:'compact',name:'Compact',use:'Shortest tunnel that passes every check',key:'L'},S.compact));
+  if(S.balanced) cards.push(Object.assign({id:'balanced',name:'Balanced',use:'Length and fan power traded evenly',key:'B',rec:true},S.balanced));
+  if(S.efficient) cards.push(Object.assign({id:'efficient',name:'Efficient',use:'Lowest fan power at top speed',key:'P'},S.efficient));
+  const res={cards,mins:S.mins,why:[],sugg:[]};
+  if(!cards.length){
+    const m=S.mins, Pm=dzLim(q.maxP)*1000;
+    if(!m){ res.why.push(q.fanD!==''?'A '+q.fanD+' cm fan gives an outlet no larger than the test section, so there is nothing to diffuse. The fan needs a larger diameter.':'No geometry could be built from these values.'); }
+    else{
+      if(m.L>dzLim(q.maxL)) res.why.push('Shortest tunnel for this flow quality is <b>'+nf(m.L/100,2)+' m</b>; the limit is '+nf(q.maxL/100,2)+' m.');
+      if(m.D>dzLim(q.maxD)) res.why.push('The smallest cross-section this flow quality allows is <b>'+ni(m.D)+' cm</b>, set by the contraction inlet (W·√CR); the limit is '+ni(q.maxD)+' cm.');
+      if(m.P>Pm){ const f=fmtW(m.P); const fl=fmtW(Pm); res.why.push('Lowest fan power at '+nf(q.V,1)+' m/s is <b>'+f.v+' '+f.u+'</b>; the limit is '+fl.v+' '+fl.u+'. Power grows with V³, so the top speed is the strongest lever.'); }
+      if(!res.why.length) res.why.push('Each limit can be met on its own, but not all of them at once. Relax one of them.');
+    }
+    /* one-click ways out, each verified by solving again */
+    const tryQ=(label,patch)=>{ const q2=Object.assign({},q,patch); const s2=dzSolve(q2,base); if(s2.compact||s2.balanced||s2.efficient) res.sugg.push({label,patch}); };
+    if(m){
+      const combo={}, n0=res.sugg.length;
+      if(m.L>dzLim(q.maxL)){ combo.maxL=Math.ceil(m.L/10)*10; tryQ('Length limit → '+nf(combo.maxL/100,1)+' m',{maxL:combo.maxL}); }
+      if(m.D>dzLim(q.maxD)){ combo.maxD=Math.ceil(m.D/5)*5; tryQ('Cross-section limit → '+combo.maxD+' cm',{maxD:combo.maxD}); }
+      if(m.P>Pm){ combo.maxP=m.P<1000?Math.ceil(m.P/10)/100:Math.ceil(m.P/100)/10; const fp=fmtW(combo.maxP*1000); tryQ('Power limit → '+fp.v+' '+fp.u,{maxP:combo.maxP}); }
+      if(Object.keys(combo).length>1&&res.sugg.length===n0) tryQ('Relax '+(Object.keys(combo).length===2?'both':'all three')+' limits',combo);
+    }
+    const qi=QORD.indexOf(q.qual); if(qi>0) tryQ('Flow quality → '+QUAL[QORD[qi-1]].name,{qual:QORD[qi-1]});
+    if(q.fanD!=='') tryQ('Let the designer choose the fan',{fanD:''});
+    if(q.maxL!==''&&q.maxD!==''&&!res.sugg.length) tryQ('Remove the length and size limits',{maxL:'',maxD:''});
+  }
+  return res;
+}
+
+/* side elevation at true scale; every card uses the same scale so the lengths compare by eye */
+function dzSvg(d,s,H){
+  const p=d.patch, Ls=dzSettle(p.nh), x1=Ls, x2=x1+p.Ln, x3=x2+p.tL, x4=x3+p.Ld, y=v=>H/2-v/2*s, yb=v=>H/2+v/2*s, X=x=>(x*s).toFixed(1);
+  const seg=(k,top,bot)=>'<path d="'+top+' '+bot+' Z" fill="'+CVAR(k)+'" fill-opacity=".22" stroke="none"/>';
+  const cx=(x1+x2)/2;
+  const nzT='M'+X(x1)+','+y(p.nh).toFixed(1)+' C'+X(cx)+','+y(p.nh).toFixed(1)+' '+X(cx)+','+y(p.th).toFixed(1)+' '+X(x2)+','+y(p.th).toFixed(1);
+  const nzB='L'+X(x2)+','+yb(p.th).toFixed(1)+' C'+X(cx)+','+yb(p.th).toFixed(1)+' '+X(cx)+','+yb(p.nh).toFixed(1)+' '+X(x1)+','+yb(p.nh).toFixed(1);
+  const box=(k,a,b,h)=>seg(k,'M'+X(a)+','+y(h).toFixed(1)+' L'+X(b)+','+y(h).toFixed(1),'L'+X(b)+','+yb(h).toFixed(1)+' L'+X(a)+','+yb(h).toFixed(1));
+  const df=seg('diff','M'+X(x3)+','+y(p.th).toFixed(1)+' L'+X(x4)+','+y(p.Dd).toFixed(1),'L'+X(x4)+','+yb(p.Dd).toFixed(1)+' L'+X(x3)+','+yb(p.th).toFixed(1));
+  const top='M0,'+y(p.nh).toFixed(1)+' L'+X(x1)+','+y(p.nh).toFixed(1)+' C'+X(cx)+','+y(p.nh).toFixed(1)+' '+X(cx)+','+y(p.th).toFixed(1)+' '+X(x2)+','+y(p.th).toFixed(1)+' L'+X(x3)+','+y(p.th).toFixed(1)+' L'+X(x4)+','+y(p.Dd).toFixed(1);
+  const bot='M0,'+yb(p.nh).toFixed(1)+' L'+X(x1)+','+yb(p.nh).toFixed(1)+' C'+X(cx)+','+yb(p.nh).toFixed(1)+' '+X(cx)+','+yb(p.th).toFixed(1)+' '+X(x2)+','+yb(p.th).toFixed(1)+' L'+X(x3)+','+yb(p.th).toFixed(1)+' L'+X(x4)+','+yb(p.Dd).toFixed(1);
+  const W=300;
+  return '<svg viewBox="-2 -2 '+(W+4)+' '+(H+4).toFixed(1)+'" role="img" aria-label="Side elevation, '+nf(d.Ltot/100,2)+' m long">'+
+    box('set',0,x1,p.nh)+seg('noz',nzT,nzB)+box('test',x2,x3,p.th)+df+
+    '<path d="'+top+'" fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linejoin="round"/><path d="'+bot+'" fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-linejoin="round"/>'+
+    '<path d="M0,'+y(p.nh).toFixed(1)+' V'+yb(p.nh).toFixed(1)+' M'+X(x4)+','+y(p.Dd).toFixed(1)+' V'+yb(p.Dd).toFixed(1)+'" stroke="var(--ink)" stroke-width="1.2" stroke-dasharray="2 2" fill="none"/></svg>';
+}
+function dzCard(d,i,s,H){
+  const p=d.patch, r=d.r, pw=fmtW(d.Pfan), near=r.thd>3.0001;
+  const row=(t,v,key)=>'<dt'+(key?' class="key"':'')+'>'+t+'</dt><dd'+(key?' class="key"':'')+'>'+v+'</dd>';
+  return '<article class="dz-card'+(d.rec?' rec':'')+'"><header><h3>'+d.name+(d.rec?'<span class="tag">Recommended</span>':'')+'</h3><p>'+d.use+'</p></header>'+
+    dzSvg(d,s,H)+
+    '<dl class="dz-kv">'+
+      row('Overall length',nf(d.Ltot/100,2)+' m',d.key==='L'||d.key==='B')+
+      row('Largest section',ni(d.Dmax)+' cm')+
+      row('Contraction inlet',ni(p.nw)+' × '+ni(p.nh)+' cm <small>CR '+nf(r.CR,2)+'</small>')+
+      row('Contraction length',ni(p.Ln)+' cm <small>L/H '+nf(p.Ln/p.nh,2)+'</small>')+
+      row('Diffuser',ni(p.Ld)+' cm <small>θe '+nf(r.thd,2)+'° · AR '+nf(r.AR,2)+'</small>')+
+      row('Fan / outlet Ø',ni(p.Dd)+' cm')+
+      row('Screens',String(p.N))+
+      row('Total Δp',nf(r.dptot,0)+' Pa')+
+      row('Fan power',pw.v+' '+pw.u+' <small>η '+nf(P.eta,2)+'</small>',d.key==='P'||d.key==='B')+
+    '</dl>'+
+    (near?'<p class="dz-flag near">Diffuser at θe '+nf(r.thd,2)+'°, near the 3.5° limit. Accepted in practice, but the flow has little margin.</p>'
+         :'<p class="dz-flag">All sheet checks pass: CR '+nf(r.CR,1)+', θe ≤ 3°, Mach '+nf(r.M,3)+'.</p>')+
+    '<button type="button" class="btn pri" data-dzl="'+i+'">Load into sheet</button></article>';
+}
+function dzRender(){
+  const out=$('#dzOut'); if(!out) return;
+  const e=dzErrors(REQ);
+  if(e.length){ DZ=null; out.innerHTML='<div class="errbox" role="alert"><b>Designer paused. Fix the requirement:</b><ul>'+e.map(x=>'<li>'+x+'</li>').join('')+'</ul></div>'; return; }
+  if(validate(P).length){ DZ=null; out.innerHTML='<div class="errbox" role="alert"><b>Designer paused.</b> It takes the air, fan efficiency, honeycomb and screens from the sheet below, and the sheet has an invalid input.</div>'; return; }
+  DZ=dzRun(REQ,P);
+  if(DZ.mach){ out.innerHTML='<div class="dz-msg"><h3>Too fast for this sheet</h3><ul><li>At '+nf(REQ.V,1)+' m/s the Mach number reaches 0.3, where the incompressible relations stop being valid. The highest speed it can design for is about '+DZ.Vmax+' m/s.</li></ul>'+dzSugg()+'</div>'; return; }
+  if(!DZ.cards.length){ out.innerHTML='<div class="dz-msg"><h3>No design meets every requirement</h3><ul>'+DZ.why.map(x=>'<li>'+x+'</li>').join('')+'</ul>'+dzSugg()+'</div>'; return; }
+  const maxL=Math.max(...DZ.cards.map(d=>d.Ltot)), maxD=Math.max(...DZ.cards.map(d=>d.Dmax)), s=300/maxL, H=maxD*s;
+  let h='<div class="dz-cards">'+DZ.cards.map((d,i)=>dzCard(d,i,s,H)).join('')+'</div>';
+  const notes=[];
+  if(DZ.cards.length<3) notes.push('Only the compact option fits: the limits leave no room for a diffuser at θe ≤ 3°.');
+  notes.push('Overall length includes a schematic settling chamber of 0.8 × inlet height, as in the drawing. Air, fan efficiency, honeycomb, screen mesh and model are taken from the sheet.');
+  h+='<p class="dz-note">'+notes.join(' ')+'</p>';
+  out.innerHTML=h; dzMarkLoaded();
+}
+function dzSugg(){ return DZ.sugg.length?'<div class="dz-sug">'+DZ.sugg.map((f,i)=>'<button type="button" class="btn" data-dzs="'+i+'">'+f.label+'</button>').join('')+'</div>':''; }
+function dzMarkLoaded(){
+  if(!DZ||!DZ.cards) return;
+  document.querySelectorAll('#dzOut [data-dzl]').forEach(b=>{ const d=DZ.cards[+b.dataset.dzl]; if(!d) return;
+    const on=Object.keys(d.patch).every(k=>P[k]===d.patch[k]);
+    b.setAttribute('aria-pressed',String(on)); b.textContent=on?'In the sheet ✓':'Load into sheet'; });
+}
+function dzSchedule(){ clearTimeout(dzT); dzT=setTimeout(dzRender,80); }
+function dzBaseChanged(){
+  const sig=JSON.stringify(['T','P','eta','fD','LhDh','betah','lamh','dw','wm','Kmesh','Cd','mode','chord'].map(k=>P[k]));
+  if(sig!==dzBaseChanged.sig){ dzBaseChanged.sig=sig; dzRender(); }
+}
+function dzSyncInputs(){
+  DZF.forEach(f=>{ const inp=$('#dz-'+f.k); if(document.activeElement!==inp) inp.value=showNum(REQ[f.k]); inp.parentNode.classList.toggle('bad',!(f.opt&&REQ[f.k]==='')&&!isFinite(REQ[f.k])); });
+  document.querySelectorAll('#dzReq .seg button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.q===REQ.qual)));
+  const Q=QUAL[REQ.qual]; $('#dzQd').textContent=Q.use+' · CR '+Q.cr[0]+'–'+Q.cr[1]+', '+Q.N+' screens';
+}
+function buildDesigner(){
+  const host=$('#dzReq');
+  const fld=f=>'<div class="fld"><label for="dz-'+f.k+'">'+f.label+(f.hint?'<small>'+f.hint+'</small>':'')+'</label><div class="inp"><input id="dz-'+f.k+'" inputmode="decimal" autocomplete="off"'+(f.opt?' placeholder="no limit"':'')+'><span>'+f.unit+'</span></div></div>';
+  host.innerHTML=
+    '<div class="grp"><header><h3><i style="background:var(--accent)"></i>What the tunnel must do</h3><span class="mref">Mehta &amp; Bradshaw 1979</span></header>'+
+      DZF.filter(f=>f.g==='need').map(fld).join('')+
+      '<div class="dz-q"><span class="dz-ql" id="dzQl">Flow quality</span><div class="seg" role="group" aria-labelledby="dzQl">'+QORD.map(k=>'<button type="button" data-q="'+k+'">'+QUAL[k].name+'</button>').join('')+'</div><p id="dzQd"></p></div>'+
+    '</div>'+
+    '<div class="grp"><header><h3><i style="background:var(--muted)"></i>Limits</h3><span class="mref">optional · leave empty for none</span></header>'+
+      DZF.filter(f=>f.g==='lim').map(fld).join('')+
+      '<p class="dz-note">Test section and speed start from the sheet. <button type="button" id="dzFromSheet">Copy them from the sheet again</button></p>'+
+    '</div>';
+  DZF.forEach(f=>{ const inp=$('#dz-'+f.k);
+    inp.addEventListener('input',()=>{ let v=parseNum(inp.value); if(v===''&&!f.opt) v=NaN; REQ[f.k]=v;
+      inp.parentNode.classList.toggle('bad',!(f.opt&&v==='')&&!isFinite(v)); dzSave(); dzSchedule(); }); });
+  host.querySelectorAll('.seg button').forEach(b=>b.addEventListener('click',()=>{ REQ.qual=b.dataset.q; dzSave(); dzSyncInputs(); dzSchedule(); }));
+  $('#dzFromSheet').addEventListener('click',()=>{ ['tw','th','tL','V'].forEach(k=>REQ[k]=P[k]); dzSave(); dzSyncInputs(); dzSchedule(); });
+  $('#dzOut').addEventListener('click',e=>{
+    const b=e.target.closest('[data-dzl]');
+    if(b&&DZ&&DZ.cards){ const d=DZ.cards[+b.dataset.dzl]; if(!d) return;
+      if(b.getAttribute('aria-pressed')==='true'){ goChapter('top'); return; }
+      const prev={}; for(const k in d.patch) prev[k]=P[k];
+      Object.assign(P,d.patch); UNDO={label:'Designer · '+d.name,prev};
+      FIELDS.forEach(f=>$('#in-'+f.k).parentNode.classList.remove('bad'));
+      syncInputs(); schedule(); dzMarkLoaded(); goChapter('top'); return; }
+    const sb=e.target.closest('[data-dzs]');
+    if(sb&&DZ){ const f=DZ.sugg[+sb.dataset.dzs]; if(!f) return; Object.assign(REQ,f.patch); dzSave(); dzSyncInputs(); dzRender(); }
+  });
+  dzSyncInputs();
+}
+
 /* ================= boot ================= */
 readTheme();
 HV=makeView($('#tunnel'),'hero');
 FV=makeView($('#flyStage'),'fly');
 HV.cvT.addEventListener('click',canvasClick(HV));
 FV.cvT.addEventListener('click',canvasClick(FV));
-buildGeo(); syncInputs(); measureDock(); update();
+buildGeo(); buildDesigner(); syncInputs(); measureDock(); update();
 setupReveals();
 renderSweep(R); renderMatlab(); blueprint();
 requestAnimationFrame(loop);
