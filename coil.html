@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cooling Coil &amp; Chiller Designer for Icing Wind Tunnels | Smokeline</title>
+<meta name="description" content="Design the cooling coil and size the chiller of a closed-circuit icing wind tunnel from your test requirements: two-stage plate-fin coil, secondary fluid, supply temperature, pump, refrigeration load, ice on the fins, and a manufacturer-ready specification. Free, in the browser.">
+<meta name="keywords" content="icing wind tunnel, cooling coil design, heat exchanger design, chiller sizing, refrigeration load, secondary coolant, plate fin coil, Smokeline">
+<link rel="canonical" href="https://windtunnel-theta.vercel.app/coil.html">
+<meta property="og:type" content="website"><meta property="og:site_name" content="Smokeline">
+<meta property="og:title" content="Coil &amp; Chiller designer | Smokeline">
+<meta property="og:description" content="From icing-test requirements to a cooling coil a manufacturer can quote, and the chiller power to go with it.">
+<meta property="og:url" content="https://windtunnel-theta.vercel.app/coil.html">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="coil/coil.css">
+</head>
+<body>
+<header class="cbar">
+  <div class="wrap">
+    <a class="wm" href="./">SMOKE<em>LINE</em></a>
+    <nav class="sw" aria-label="Tool">
+      <a href="./"><svg viewBox="0 0 22 12" aria-hidden="true"><path d="M1 2h5l4 3h4l7-3M1 10h5l4-3h4l7 3"/></svg><span>Open circuit</span></a>
+      <a href="./#icing"><svg viewBox="0 0 22 12" aria-hidden="true"><rect x="1" y="1" width="20" height="10" rx="2.5"/><path d="M6 6h10"/></svg><span>Closed · Icing</span></a>
+      <a href="coil.html" aria-current="page"><svg viewBox="0 0 22 12" aria-hidden="true"><path d="M2 1v10M6 1v10M10 1v10M14 1v10M18 1v10M1 4h20M1 8h20"/></svg><span>Coil · Chiller</span></a>
+    </nav>
+    <nav class="cnav" aria-label="Sections"><a href="#studio">Design</a><a href="#spec">Spec sheet</a><a href="#load">Cooling load</a><a href="#alts">Alternatives</a><a href="#ice">Ice</a><a href="#method">Method</a></nav>
+  </div>
+</header>
+
+<main>
+<section class="hero dark">
+  <div class="wrap">
+    <div>
+      <p class="eyebrow">Coil &amp; chiller · closed-circuit icing tunnel</p>
+      <h1><span class="g">Tell it</span><br>the cloud.<br><span class="o">Get the coil.</span></h1>
+      <p class="lede">Set the test point you need: temperature, speed, water content, droplet size and how long a spray run must last. The page works out the heat the loop must reject, picks a <b>two-stage finned-tube coil</b> and a secondary fluid from manufacturers' datasheets, checks the ice on its fins, and hands you a <b>specification a coil manufacturer can quote</b> and the <b>chiller capacity</b> to buy.</p>
+    </div>
+    <div class="kgrid" id="kpi" aria-live="polite"></div>
+  </div>
+</section>
+
+<section class="studio dark" id="studio" aria-label="Coil designer">
+  <div class="wrap">
+    <form class="console" id="console" autocomplete="off" onsubmit="return false"></form>
+    <div class="stagewrap">
+      <div class="stage" id="stage">
+        <div class="v3-host" id="v3"></div>
+        <div class="hud"><div class="id" id="hudId"></div><div class="temp" id="hudT"></div></div>
+        <div class="busy" id="busy"><div class="card"><svg class="ring" viewBox="0 0 40 40"><circle class="bg" cx="20" cy="20" r="16"/><circle class="fg" id="ringFg" cx="20" cy="20" r="16" stroke-dasharray="100.5" stroke-dashoffset="100.5"/></svg><div><div class="t" id="busyT">Designing</div><div class="s" id="busyS"></div></div></div></div>
+        <div class="tools">
+          <div class="seg" role="group" aria-label="View" id="views"><button type="button" data-v="iso" aria-pressed="true">3D</button><button type="button" data-v="air">Air side</button><button type="button" data-v="headers">Headers</button><button type="button" data-v="top">Top</button><button type="button" data-v="section">Section</button></div>
+          <div class="seg" role="group" aria-label="Show" id="togs"><button type="button" data-t="air" aria-pressed="true">Airflow</button><button type="button" data-t="trace" aria-pressed="true">Circuit</button><button type="button" data-t="fins" aria-pressed="true">Fins</button><button type="button" data-t="casing" aria-pressed="true">Casing</button><button type="button" data-t="cut" aria-pressed="false">Cutaway</button><button type="button" data-t="explode" aria-pressed="false">Explode</button><button type="button" data-t="labels" aria-pressed="true">Labels</button></div>
+          <div class="scrub"><label for="iceT">Spray</label><div class="tr" id="scrubTr"><input type="range" id="iceT" min="0" max="1000" value="0"></div><output id="iceOut" for="iceT">0 min</output></div>
+        </div>
+      </div>
+      <div class="strip" id="strip"></div>
+      <div class="msgs" id="msgs"></div>
+    </div>
+  </div>
+</section>
+
+<div class="light">
+<section class="sec" id="spec">
+  <div class="wrap">
+    <div class="shead"><div class="secno">01</div><div><p class="eyebrow">Production recommendation</p><h2>The sheet you send to the coil maker</h2><p class="sub">Duty, geometry, fluid, hydraulics, materials and the icing service on one page. The geometry is a proposal: a manufacturer re-rates it in its own selection program and may offer its own fin and tube pattern. Ask for that rating at both duty points.</p></div></div>
+    <article class="sheet" id="sheet"></article>
+    <div class="acts"><button class="btn pri" id="bCopy" type="button">Copy as text</button><button class="btn" id="bMd" type="button">Download .md</button><button class="btn" id="bM" type="button">Download MATLAB G.hx</button><button class="btn" id="bPng" type="button">Save 3D view</button><button class="btn" id="bPrint" type="button">Print / PDF</button><span class="note" id="actNote" role="status"></span></div>
+  </div>
+</section>
+
+<section class="sec" id="load">
+  <div class="wrap">
+    <div class="shead"><div class="secno">02</div><div><p class="eyebrow">Cooling load · chiller power</p><h2>How big the cold side must be</h2><p class="sub">In a closed loop every watt the fan puts into the air comes back as heat, together with the walls and the spray water that freezes. The coil has to remove all of it at the iced point, when ice on the vanes and fins has pushed the circuit loss up to the fan's limit λ<sub>fan</sub>. This part updates as you type; it does not wait for the coil search.</p></div></div>
+    <div class="twoa">
+      <div class="card"><header><h3>Heat the coil must remove</h3><span id="lPoint"></span></header><div class="lbars" id="lbars"></div></div>
+      <div class="chiller" id="chiller"></div>
+    </div>
+    <div class="two" style="margin-top:18px">
+      <div class="chart" id="lChart"><h3><span>Load across the test envelope</span><span class="seg" role="group" aria-label="Sweep"><button type="button" data-x="V" aria-pressed="true">Speed</button><button type="button" data-x="T" aria-pressed="false">Temperature</button><button type="button" data-x="LWC" aria-pressed="false">LWC</button></span></h3><div class="ch"></div><p class="note" id="lChartNote"></p></div>
+      <div class="card"><header><h3>How sure is the load?</h3><span>K<sub>top</sub> sensitivity · recommended coil</span></header><div class="tscroll"><table class="t" id="kTab"></table></div><div class="cpad note" id="kNote"></div></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="alts">
+  <div class="wrap">
+    <div class="shead"><div class="secno">03</div><div><p class="eyebrow">Fluids and alternatives</p><h2>Every fluid, its best coil</h2><p class="sub">For each fluid the search keeps the coil that lets the chiller run warmest, then checks the fluid's own limits: lowest use temperature, freezing margin at the evaporator wall, and the CO₂ cascade limit. Flammable fluids carry a penalty when you prefer non-flammable ones. Pick a row to see that coil in 3D.</p></div></div>
+    <div class="card"><header><h3>Supply temperature the chiller must deliver, iced load</h3><span>bar: optimistic ↔ conservative laminar band · tick: clean load</span></header><div class="ladder" id="ladder"></div></div>
+    <div class="chart" style="margin-top:18px" id="scatter"><h3><span>Design space: every candidate coil that met the limits</span><span class="note" id="scN"></span></h3><div class="ch"></div><p class="note">Each dot is one geometry × circuiting × flow. Up is better (warmer chiller); right costs pump power that also ends up in the chiller. The ringed dot is the recommendation.</p></div>
+  </div>
+</section>
+
+<section class="sec" id="ice">
+  <div class="wrap">
+    <div class="shead"><div class="secno">04</div><div><p class="eyebrow">Ice through the loop</p><h2>Where the spray water goes</h2><p class="sub">Droplets the model does not catch fly on through the corner vanes, the fan and finally the coil. Heated corner vanes keep their ice-free shape, so more water reaches the coil. The front-stage fin pitch is sized so that the leading-edge ice horns do not close the gap before the run ends in the worst sizing case.</p></div></div>
+    <div class="card"><header><h3>Water budget</h3><span id="fbLab"></span></header><div class="cpad"><div class="flowbar" id="flowbar"></div><p class="note" id="fbNote"></p></div></div>
+    <div class="two" style="margin-top:18px">
+      <div class="card"><header><h3>Run time per droplet size and corner heating</h3><span>recommended coil</span></header><div class="cpad"><div class="mx" id="mx"></div><p class="note" id="mxNote" style="margin-top:12px"></p></div></div>
+      <div class="chart" id="bChart"><h3><span>Blockage and circuit loss during the run</span><span class="note" id="bLab"></span></h3><div class="ch"></div><p class="note">Blockage b = ice width / free gap; the run is over at b<sub>lim</sub>. λ = circuit loss / clean loss (upper bound); the fan holds the speed up to λ<sub>fan</sub>.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="method">
+  <div class="wrap">
+    <div class="shead"><div class="secno">05</div><div><p class="eyebrow">Method · sources · what is not verified</p><h2>How the numbers are made</h2><p class="sub">This page runs the same equations as the project's MATLAB tool (<span class="mono">esanjor_tasarim.m</span>, matlab_v2) and reproduces its reports to the last digit. The chain below follows the recommended coil at the iced load. The table after it lists every relation and constant with its source and how far it has been checked: treat anything not marked “checked” as an estimate.</p></div></div>
+    <div class="two">
+      <div class="card"><header><h3>Calculation chain, recommended coil</h3><span>iced load · conservative L</span></header><div class="cpad"><ol class="chain" id="chain"></ol></div></div>
+      <div class="card"><header><h3>Search</h3><span>esanjor_tasarim.m</span></header><div class="cpad" id="searchTxt"></div></div>
+    </div>
+    <div class="card" style="margin-top:18px"><header><h3>Sources and verification status</h3><span>36 items</span></header><div class="tscroll"><table class="t vt" id="vt"></table></div></div>
+  </div>
+</section>
+</div>
+</main>
+<footer class="cf light"><div class="wrap"><span>© Kerim Yılmaz · Smokeline · AGPL-3.0. Preliminary design estimate; it does not replace the manufacturer's rating, a single-circuit test or measurement.</span><span><a href="./">Open circuit</a> · <a href="./#icing">Closed · Icing</a></span></div></footer>
+<script src="coil/hxcore.js"></script>
+<script src="coil/sources.js"></script>
+<script src="coil/view3d.js"></script>
+<script src="coil/app.js"></script>
+</body>
+</html>
