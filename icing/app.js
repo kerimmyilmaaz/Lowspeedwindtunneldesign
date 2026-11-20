@@ -113,7 +113,7 @@ const FIELDS=[
  F('ik','th','Insulation conductivity','W/mK',0.025,'G.yal.k'),
  F('ihi','th','Inner film coefficient','W/m²K',30,'G.yal.h_ic'),
  F('iho','th','Outer film coefficient','W/m²K',8,'G.yal.h_dis'),
- F('tmarg','th','Refrigeration selection margin','×',1.3,'G.isil_marj'),
+ F('tmarg','th','Refrigeration selection margin (on the iced load)','×',1.3,'G.isil_marj'),
  F('Vs','th','Second scenario speed (S1)','m/s',25,'G.V_surekli · G.sen.V(1)'),
  F('LWCs','th','S1 cooling-point LWC','g/m³',1.0,'G.LWC_surekli',{zero:true}),
  F('leak','th','Leakage and joints factor','×',1.10,'G.sizinti'),
@@ -121,7 +121,7 @@ const FIELDS=[
  F('bzHx','ice','Iced coil Δp factor [NA2]','×',3.0,'G.buz.hx'),
  F('bzC1','ice','Severe corner-1 K factor [NO]','×',5.4,'G.buz.kose1_siddetli'),
  F('bzSt','ice','2D-model diffuser stall, power factor [B]','×',2.5,'G.buz.stall_guc'),
- F('Qk','ops','Refrigeration capacity','kW',45,'G.isil.Q_sec'),
+ F('Qk','ops','Refrigeration capacity (0 = the selection above)','kW',0,'G.isil.Q_sec',{zero:true}),
  F('dTy','ops','Air – secondary fluid approach','K',12,'G.isil.dTy'),
  F('dTa','ops','Allowed temperature drift in a run','K',1.0,'G.isil.dT_izin'),
  F('tic','ops','Inner shell thickness (Al)','mm',2,'G.isil.t_ic'),
@@ -171,7 +171,7 @@ function validate(p){
 }
 
 /* ================= state ================= */
-const LS='smokeline.icing.v3';   /* v3: kapali_devre_1D.m v1.7 inputs (S2 = 40 m/s, S1 = 25 m/s, −35 °C); older saved values are not carried over */
+const LS='smokeline.icing.v4';   /* v4: kapali_devre_1D.m v1.8 (margin on the iced load; operating-cycle capacity from the selection); older saved values are not carried over */
 let P=defaults();
 try{ const s=JSON.parse(localStorage.getItem(LS)||'null'); if(s&&typeof s==='object') for(const k in P) if(k in s) P[k]=s[k]; }catch(_){}
 function save(){ try{ localStorage.setItem(LS,JSON.stringify(P)); }catch(_){} }
@@ -235,6 +235,8 @@ function compute(){
   const h=E.air(P.T,P.p), G=buildG(P);
   const R=E.circuit(G,P.V,P.yer,h), SN=E.scenarios(G,P.V,P.yer,h,R), Rs=SN[0].R;
   const TB=E.thermal(R,G,P.LWC,h), TBs=E.thermal(Rs,G,P.LWCs,h);
+  /* v1.8: capacity 0 → the operating cycle runs with the refrigeration selection of the design point (G.isil.Q_sec empty) */
+  if(!(P.Qk>0)){ G.ops.Q_sec=TB.sec; G.ops.Q_kap=[0.75*TB.sec,TB.sec,1.25*TB.sec]; }
   const IC=E.icing(R,G,h), AU=E.audit(R,G,h,IC), GT=E.geometryTable(R), FC=E.fanPoint(R,G,curve());
   const Ralt=E.circuit(G,P.V,P.yer==='ayri'?'birlikte':'ayri',h);
   const Vmax=Math.max(55,Math.ceil(P.V*1.1/5)*5), SW=E.sweep(G,P.yer,h,Vmax);
@@ -695,7 +697,7 @@ function renderZoomCards(){
     {k:'fan',st:[['Δp, iced (λ '+nf(P.lamF,1)+')',ni(R.dp_top*P.lamF),'Pa'],['Shaft',kW(R.P_mil).v,kW(R.P_mil).u],['Heat in',kW(TB.fan+TB.motor).v,kW(TB.fan+TB.motor).u]],
       note:'One Ø'+nf(P.fD,0)+' cm axial fan'+(P.kap?' with a hub fairing and straightener':'')+' restores the '+nf(R.dp_top,0)+' Pa lost round the clean loop, and must keep doing so as ice raises the loss to λ_fan × that. Every watt of shaft power ends up as heat in the air'+(P.motorIn?', plus the motor losses since the motor sits in the stream':'')+'.'},
     {k:'hx',st:[['Face V',nf(R.hx.V,2),'m/s'],['Δp',nf(R.hx.dp,0),'Pa'],['Cooling',kW(TB.sec).v,kW(TB.sec).u]],
-      note:'The coil removes fan heat, wall heat and the latent heat of the spray water: '+kW(TB.top).v+' '+kW(TB.top).u+' at the design point clean, '+kW(TB.sec).v+' '+kW(TB.sec).u+' for selection (iced point or margin, whichever is larger). It is also the largest single loss in the circuit.'}
+      note:'The coil removes fan heat, wall heat and the latent heat of the spray water: '+kW(TB.top).v+' '+kW(TB.top).u+' at the design point clean, '+kW(TB.sec).v+' '+kW(TB.sec).u+' for selection ('+nf(P.tmarg,2)+' × the iced load). It is also the largest single loss in the circuit.'}
   ];
   $('#izCards').innerHTML=C.map((s,i)=>'<article class="fc" aria-hidden="true"><div class="fc-top"><span>'+pad2(i+1)+' / 06</span><span>'+ZST[i].name+'</span></div>'+
     '<h3><i style="background:'+KC(s.k)+'"></i>'+ZST[i].name+'</h3><dl class="fc-st">'+s.st.map(x=>'<div><dt>'+x[0]+'</dt><dd>'+x[1]+(x[2]?'<small>'+x[2]+'</small>':'')+'</dd></div>').join('')+'</dl>'+
@@ -739,7 +741,7 @@ function probe(v,cx,cy){
 function renderHero(){
   const R=S.R, TB=S.TB, IC=S.IC, AU=S.AU, pm=kW(R.P_mil), pc=kW(TB.sec);
   const items=[['Test speed',nf(R.V,1),'m/s · M '+nf(R.M,3)],['Static temperature',nf(P.T,1),'°C · T₀ '+nf(IC.Tstag,1)+' °C'],['Flow rate Q',ni(R.Q*3600),'m³/h · '+nf(R.Q,2)+' m³/s'],
-    ['Mass flow ṁ',nf(R.mdot,2),'kg/s · ρ '+nf(R.rho,3)],['Fan shaft power',pm.v,pm.u+' · Δp '+ni(R.dp_top)+' Pa'],['Cooling load',pc.v,pc.u+(TB.secBy==='iced'?' · iced point (λ_fan)':' · ×'+nf(P.tmarg,2)+' margin')]];
+    ['Mass flow ṁ',nf(R.mdot,2),'kg/s · ρ '+nf(R.rho,3)],['Fan shaft power',pm.v,pm.u+' · Δp '+ni(R.dp_top)+' Pa'],['Cooling load',pc.v,pc.u+' · '+nf(P.tmarg,2)+' × '+(TB.secBy==='iced'?'iced load (λ_fan)':'clean load')]];
   $('#ireadouts').innerHTML=items.map(i=>'<div class="ro"><div class="l">'+i[0]+'</div><div class="v">'+i[1]+'</div><div class="u">'+i[2]+'</div></div>').join('');
   const cnt=sevCount(AU), bad=AU.filter(c=>c.sev==='bad'||c.sev==='warn');
   let h='<li class="chip '+(cnt.bad?'bad':cnt.warn?'warn':'ok')+'"><button type="button" data-igo="iaudit">Design audit · '+(cnt.bad?cnt.bad+' critical · ':'')+cnt.warn+' warning'+(cnt.warn===1?'':'s')+' · '+cnt.ok+' passed</button></li>';
@@ -1088,10 +1090,11 @@ function renderThermal(){
   const R=S.R, TB=S.TB, TBs=S.TBs, IC=S.IC, mx=Math.max(TB.sec,TBs.sec);
   const parts=[['fan','Fan shaft','k-fan'],['motor','Motor losses','k-model'],['duvar','Walls','k-duct'],['sprey','Spray water','k-hx']];
   const row=(lab,sub,t)=>'<div class="th-row"><div class="l">'+lab+'<small>'+sub+'</small></div><div class="th-st">'+parts.map(p=>'<span title="'+p[1]+' '+kW(t[p[0]]).v+' '+kW(t[p[0]]).u+'" style="width:'+(t[p[0]]/mx*100).toFixed(2)+'%;background:var(--'+p[2]+')"></span>').join('')+
-    '<span title="margin" style="width:'+((t.sec-t.top)/mx*100).toFixed(2)+'%;background:repeating-linear-gradient(135deg,var(--line) 0 4px,transparent 4px 8px)"></span></div><div class="v">'+kW(t.sec).v+'<small>'+kW(t.sec).u+'</small></div></div>';
+    '<span title="iced point: fan heat × λ_fan" style="width:'+((Math.max(t.iced,t.top)-t.top)/mx*100).toFixed(2)+'%;background:repeating-linear-gradient(135deg,var(--muted) 0 2px,transparent 2px 4px)"></span>'+
+    '<span title="selection margin" style="width:'+((t.sec-Math.max(t.iced,t.top))/mx*100).toFixed(2)+'%;background:repeating-linear-gradient(135deg,var(--line) 0 4px,transparent 4px 8px)"></span></div><div class="v">'+kW(t.sec).v+'<small>'+kW(t.sec).u+'</small></div></div>';
   $('#ithBars').innerHTML=row('S2 · design',nf(P.V,0)+' m/s · '+nf(P.LWC,1)+' g/m³',TB)+row('S1',nf(P.Vs,0)+' m/s · '+nf(P.LWCs,1)+' g/m³',TBs)+
-    '<div class="th-leg">'+parts.map(p=>'<span><i style="background:var(--'+p[2]+')"></i>'+p[1]+' '+kW(TB[p[0]]).v+' '+kW(TB[p[0]]).u+'</span>').join('')+'<span><i style="background:repeating-linear-gradient(135deg,var(--muted) 0 2px,transparent 2px 4px)"></i>'+(TB.secBy==='iced'?'Iced point: fan heat × λ<sub>fan</sub> '+nf(P.lamF,1):'Selection margin ×'+nf(P.tmarg,2))+'</span></div>'+
-    '<p class="note" style="margin:12px 0 0">Wall U = '+nf(TB.U,3)+' W/m²K over '+nf(R.A_duvar,1)+' m². Spray water is cooled from '+nf(P.spT,0)+' °C, frozen and sub-cooled to '+nf(P.T,0)+' °C: '+nf(TB.m_su*3600,1)+' kg/h. Air temperature rise through the fan '+nf((TB.fan+TB.motor)/(R.mdot*1005),2)+' K. The refrigeration figure is the larger of the clean load × '+nf(P.tmarg,2)+' and the iced load ('+kW(TB.iced).v+' '+kW(TB.iced).u+'), because the fan keeps the speed up to λ<sub>fan</sub> and all of that power ends up as heat. <a href="coil.html">Design the coil and size the chiller →</a></p>';
+    '<div class="th-leg">'+parts.map(p=>'<span><i style="background:var(--'+p[2]+')"></i>'+p[1]+' '+kW(TB[p[0]]).v+' '+kW(TB[p[0]]).u+'</span>').join('')+'<span><i style="background:repeating-linear-gradient(135deg,var(--muted) 0 2px,transparent 2px 4px)"></i>Iced point: fan heat × λ<sub>fan</sub> '+nf(P.lamF,1)+'</span><span><i style="background:repeating-linear-gradient(135deg,var(--line) 0 4px,transparent 4px 8px);border:1px solid var(--line)"></i>Selection margin ×'+nf(P.tmarg,2)+'</span></div>'+
+    '<p class="note" style="margin:12px 0 0">Wall U = '+nf(TB.U,3)+' W/m²K over '+nf(R.A_duvar,1)+' m². Spray water is cooled from '+nf(P.spT,0)+' °C, frozen and sub-cooled to '+nf(P.T,0)+' °C: '+nf(TB.m_su*3600,1)+' kg/h. Air temperature rise through the fan '+nf((TB.fan+TB.motor)/(R.mdot*1005),2)+' K. The refrigeration figure is '+nf(P.tmarg,2)+' × the iced load ('+kW(TB.iced).v+' '+kW(TB.iced).u+'): the fan keeps the speed up to λ<sub>fan</sub> and all of that power ends up as heat, and the margin sits on top of that point, as for the fan motor. The chiller adds the secondary-fluid pump heat on top.'+(P.Qk>0?'':' The operating cycle below runs with this capacity.')+' <a href="coil.html">Design the coil and size the chiller →</a></p>';
   const kv=(l,v,u)=>'<div><div class="l">'+l+'</div><div class="v">'+v+(u?'<small>'+u+'</small>':'')+'</div></div>';
   $('#iicCard').innerHTML='<h3>Icing cloud at the model<small>Langmuir–Blodgett · Anderson</small></h3><div class="ic-kv">'+
     kv('Spray water',nf(IC.water_Lh,1),'L/h')+kv('Per nozzle',nf(IC.perNoz,2),'L/h')+kv('Stagnation β₀',nf(IC.beta0,2),'')+kv('Modified inertia K₀',nf(IC.K0,2),'')+

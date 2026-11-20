@@ -30,7 +30,7 @@ const GROUPS=[
   {id:'g2',t:'Tunnel and heat loads',i:'from the closed-circuit sheet',f:[
     ['tsw','Test section width','G.TS.w','cm',100,20,150,1],['tsh','Test section height','G.TS.h','cm',100,20,150,1],
     ['cw','Coil face width','G.hx.W','m',1,0.5,3,0.05],['ch','Coil face height','G.hx.H','m',1,0.5,3,0.05],
-    ['kt','Circuit loss K<sub>top</sub>','load.K_top','',1,0.1,2,0.0005],['lam','Fan margin λ<sub>fan</sub>','G.lam_fan','×',1,1,4,0.1],
+    ['kt','Circuit loss K<sub>top</sub>','load.K_top','',1,0.1,2,0.0005],['lam','Fan margin λ<sub>fan</sub>','G.lam_fan','×',1,1,4,0.1],['mj','Refrigeration margin (on the iced load)','load.marj','×',1,1,2,0.05],
     ['ef','Fan efficiency','load.eta_fan','',1,0.3,0.95,0.01],['em','Motor efficiency','load.eta_motor','',1,0.5,1,0.01],
     ['uw','Wall U','load.U_wall','W/m²K',1,0.05,5,0.001],['aw','Cold wall area','load.A_wall','m²',1,5,500,0.01],
     ['tl','Lab temperature','load.T_lab','°C',1,0,40,1],['tw','Spray water','load.T_w','°C',1,0,60,1],
@@ -131,9 +131,9 @@ function GofIst(){ const G=deep(ist.G); Object.assign(G,{V:ist.V,T:ist.T,p:ist.p
 /* ---------------- KPI hero ---------------- */
 function renderKPI(){
   const Y=H.load(GofIst()), a=cur(), e=a&&a.best, stale=busy;
-  const Q=e?e.chiller.Q:Y.Q_iced;
+  const Q=e?e.chiller.Q_sel:Y.Q_sel;
   $('#kpi').innerHTML=
-    '<div class="k-big'+(stale?' busy':'')+'"><div class="k-l">Chiller capacity, iced point</div><div class="k-v">'+kW(Q)+'<small>kW</small></div><div class="k-s">'+(e?'incl. '+kW(e.R.P_shaft)+' kW pump heat · clean '+kW(e.chiller.Q_clean)+' kW':'load only · pump heat after the coil search')+'</div></div>'+
+    '<div class="k-big'+(stale?' busy':'')+'"><div class="k-l">Chiller capacity to specify</div><div class="k-v">'+kW(Q)+'<small>kW</small></div><div class="k-s">'+(e?f(e.chiller.marj,2)+' × iced load + '+kW(e.R.P_shaft)+' kW pump · iced point without margin '+kW(e.chiller.Q)+' kW':f(Y.marj,2)+' × iced load · pump heat after the coil search')+'</div></div>'+
     '<div class="'+(stale?'busy':'')+'"><div class="k-l">Fluid leaves chiller</div><div class="k-v">'+(e?f(e.T_ch,1):'—')+'<small>°C</small></div><div class="k-s">'+(e?'optimistic '+f(e.T_ch_opt,1)+' °C':'&nbsp;')+'</div></div>'+
     '<div class="'+(stale?'busy':'')+'"><div class="k-l">Coil</div><div class="k-v">'+(e?(ist.G.hx.W.toFixed(2)+'×'+ist.G.hx.H.toFixed(2)):'—')+'<small>m</small></div><div class="k-s">'+(e?(e.R.g.st.map(s=>s.rows).join(' + ')+' rows · '+f(e.R.g.depth*1e3,0)+' mm deep'):'&nbsp;')+'</div></div>';
 }
@@ -260,7 +260,8 @@ function renderSheet(){
       ['Air mass flow',f(P.mdot,2)+' kg/s'],['Air volume at coil',f(P.mdot/R.air.rho,2)+' m³/s'],
       ['Air leaving coil (total temperature)',f(P.T0,2)+' °C'],['Air entering coil, iced / clean',f(R.Tin,2)+' / '+f(Rc.Tin,2)+' °C'],
       ['Heat removed from air, iced (sizing)',kW(R.Q)+' kW',1],['Heat removed from air, clean',kW(Rc.Q)+' kW'],
-      ['Chiller capacity incl. pump heat',kW(e.chiller.Q)+' kW',1]])+'</div>'+
+      ['Chiller load at the iced point, incl. pump heat',kW(e.chiller.Q)+' kW'],
+      ['Chiller capacity to specify ('+f(e.chiller.marj,2)+' × iced load + pump)',kW(e.chiller.Q_sel)+' kW',1]])+'</div>'+
    '<div class="blk"><h4>B · <b>Fluid side</b></h4>'+kv([
       ['Secondary fluid',esc(vt.name)+(vt.flam?' (flammable)':' (non-flammable)')],['Volume flow',f(R.flow_m3h,1)+' m³/h ('+f(R.mf,2)+' kg/s)'],
       ['Supply to coil, iced, conservative',f(R.Tf_in,2)+' °C',1],['Supply to coil, iced, optimistic',f(e.R_opt.Tf_in,2)+' °C'],
@@ -292,7 +293,7 @@ function sheetText(md){
   L.push(md?'# Cooling coil specification (Smokeline)':'COOLING COIL SPECIFICATION (Smokeline)');
   L.push((md?'':'')+'Design point: '+ist.T+' °C, '+ist.V+' m/s, LWC '+ist.LWC+' g/m³, MVD '+ist.MVD+' µm, spray run '+ist.t_target+' min. Design ID '+did+'. Issued '+today+'.');
   h('A. Duty'); r('Air mass flow',f(P.mdot,2)+' kg/s'); r('Air leaving coil (total temperature)',f(P.T0,2)+' °C'); r('Air entering coil, iced / clean',f(R.Tin,2)+' / '+f(Rc.Tin,2)+' °C');
-  r('Heat removed from air, iced (sizing) / clean',kW(R.Q)+' / '+kW(Rc.Q)+' kW'); r('Chiller capacity incl. pump heat',kW(e.chiller.Q)+' kW');
+  r('Heat removed from air, iced (sizing) / clean',kW(R.Q)+' / '+kW(Rc.Q)+' kW'); r('Chiller load at the iced point, incl. pump heat',kW(e.chiller.Q)+' kW'); r('Chiller capacity to specify ('+f(e.chiller.marj,2)+' × iced load + pump)',kW(e.chiller.Q_sel)+' kW');
   h('B. Fluid side'); r('Secondary fluid',vt.name+(vt.flam?' (flammable, flash '+vt.Tflash+' °C)':' (non-flammable)')); r('Volume flow',f(R.flow_m3h,1)+' m³/h');
   r('Supply to coil, iced, conservative / optimistic',f(R.Tf_in,2)+' / '+f(e.R_opt.Tf_in,2)+' °C'); r('Fluid temperature rise',f(R.dT_f,2)+' K'); r('Coil fluid Δp',f(R.dp_f/1e3,1)+' kPa');
   r('Tube Re front / main',R.ic.map(q=>f(q.Re,0)+' '+q.regime).join(' / '));
@@ -344,18 +345,18 @@ function renderLoad(){
     '<div class="lrow"><span class="nm">Iced · λ '+f(Y.lam,1)+'</span>'+bar(3)+'<span class="tt">'+kW(ti)+' kW</span></div>'+
     '<div class="legend">'+parts.filter(p=>p[3]>0||p[2]>0).map(p=>'<span><i style="background:'+LC[p[0]]+'"></i>'+p[1]+'</span>').join('')+'</div>'+
     '<p class="note" style="margin:12px 0 0">Fan shaft power '+kW(Y.P_fan)+' kW = K<sub>top</sub> · ½ρV² · Q / η<sub>fan</sub>, all of it heat in a closed loop (motor in the air stream). Spray '+f(Y.m_w*1e3,1)+' g/s cooled, frozen and taken to '+f(ist.T,0)+' °C. '+(e?'Pump heat from the coil search goes to the chiller, not the air.':(busy?'Pump heat appears when the coil search finishes.':''))+'</p>';
-  const Q=e?e.chiller.Q:ti;
+  const Q=e?e.chiller.Q_sel:Y.Q_sel;
   let ch='<div class="l">Rate the chiller for</div><div class="big">'+kW(Q)+'<small>kW</small></div>';
   if(e){ const lo=Math.min(-60,e.chiller.T_evap_min-4), hi=Math.max(-20,e.T_ch_opt+4), x=t=>(100*(t-lo)/(hi-lo)).toFixed(2)+'%';
-    ch+='<p>with the fluid leaving it at <b>'+f(e.T_ch,1)+' °C</b> (optimistic '+f(e.T_ch_opt,1)+' °C). Ask the supplier for capacity at that temperature: catalogue figures are quoted much warmer.</p>'+
+    ch+='<p>= '+f(e.chiller.marj,2)+' × '+kW(Y.Q_iced)+' kW iced load + '+kW(e.R.P_shaft)+' kW pump heat, with the fluid leaving it at <b>'+f(e.T_ch,1)+' °C</b> (optimistic '+f(e.T_ch_opt,1)+' °C). The margin is applied to the iced load, as for the fan motor (1.15 × iced shaft power). Ask the supplier for capacity at that temperature: catalogue figures are quoted much warmer.</p>'+
       '<div class="row"><div><div class="v">'+f(e.chiller.T_evap[0],1)+' … '+f(e.chiller.T_evap[1],1)+' °C</div><div class="s">evaporating, '+ist.chiller.dT_evap.join('–')+' K below supply</div></div>'+
-      '<div><div class="v">'+kW(e.chiller.Q_clean)+' kW</div><div class="s">clean running, incl. pump</div></div>'+
+      '<div><div class="v">'+kW(e.chiller.Q)+' / '+kW(e.chiller.Q_clean)+' kW</div><div class="s">iced / clean running without margin, incl. pump</div></div>'+
       '<div><div class="v">'+f(e.chiller.CO2_margin,1)+' K</div><div class="s">above the CO₂ triple point (cascade)</div></div>'+
       '<div><div class="v">'+(isFinite(e.freeze_margin)?f(e.freeze_margin,1)+' K':'—')+'</div><div class="s">fluid freeze margin at the evaporator wall</div></div></div>'+
       '<div class="thermo" aria-hidden="true"><div class="ax"></div><div class="band" style="left:'+x(e.chiller.T_evap_min)+';width:calc('+x(e.T_ch_opt)+' - '+x(e.chiller.T_evap_min)+')"><span style="left:50%">evaporator → supply</span></div>'+
       '<div class="lim" style="left:'+x(-56.6)+'"><span>CO₂ −56.6</span></div><div class="lim l2" style="left:'+x(ist.lim.T_evap_min)+'"><span>evap. limit '+f(ist.lim.T_evap_min,0)+'</span></div>'+
       (isFinite(a.vt.Tmin)?'<div class="lim l3" style="left:'+x(a.vt.Tmin)+';background:#8FB0FF"><span style="color:#8FB0FF">fluid min use '+a.vt.Tmin+'</span></div>':'')+'</div>';
-  } else ch+='<p>'+(busy?'Searching coils: pump heat and the supply temperature follow.':'Load only, no coil found for these limits.')+'</p>';
+  } else ch+='<p>'+f(Y.marj,2)+' × '+kW(Y.Q_iced)+' kW iced load. '+(busy?'Searching coils: pump heat and the supply temperature follow.':'Load only, no coil found for these limits.')+'</p>';
   $('#chiller').innerHTML=ch;
   renderSweep(Y);
 }
@@ -476,6 +477,7 @@ function renderMethod(){
   const st=g.st;
   $('#chain').innerHTML=
     li('<i>Q</i><sub>iced</sub> = λ<sub>fan</sub> <i>Q</i><sub>fan</sub> + <i>Q</i><sub>wall</sub> + <i>Q</i><sub>spray</sub> + <i>Q</i><sub>extra</sub>', f(Y.lam,1)+' × '+kW(Y.Q_fan)+' + '+kW(Y.Q_wall)+' + '+kW(Y.Q_spray)+' + '+kW(Y.Q_extra)+' = '+kW(Y.Q_iced)+' kW')+
+    li('<i>Q</i><sub>chiller,spec</sub> = <i>m</i> · max(<i>Q</i><sub>clean</sub>, <i>Q</i><sub>iced</sub>) + <i>P</i><sub>pump</sub>', f(e.chiller.marj,2)+' × '+kW(Math.max(Y.Q_clean,Y.Q_iced))+' + '+kW(R.P_shaft)+' = '+kW(e.chiller.Q_sel)+' kW (margin on the iced load, as for the fan motor)')+
     li('<i>T</i><sub>0</sub> = <i>T</i> + '+fr('<i>V</i><sup>2</sup>','2<i>c</i><sub>p</sub>'), 'air leaves the coil at '+f(P.T0,2)+' °C; ρ = '+f(air.rho,4)+' kg/m³, μ = '+(air.mu*1e5).toFixed(3)+'·10⁻⁵ Pa·s')+
     li('<i>V</i><sub>face</sub> = '+fr('<i>ṁ</i>','ρ <i>A</i><sub>face</sub>'), f(P.mdot,3)+' kg/s over '+f(g.A_face,2)+' m² → '+f(R.Vf,3)+' m/s')+
     st.map((s,k)=>{ const r=R.stages[k]; return li((k?'Main':'Front')+' stage: <i>Nu</i> = <i>C</i> <i>Re</i><sup>0.6</sup> ('+fr('<i>A</i><sub>o</sub>','<i>A</i><sub>t0</sub>')+')<sup>−0.15</sup> <i>Pr</i><sup>1/3</sup>, &nbsp;η<sub>o</sub> = 1 − '+fr('<i>A</i><sub>fin</sub>','<i>A</i><sub>o</sub>')+'(1 − η<sub>fin</sub>)',

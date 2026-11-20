@@ -186,7 +186,7 @@ async function exportSheet(ST,O,prog){
   kvGrid([
     ['Test section',nf(P.a,0)+'×'+nf(P.a,0)+'×'+nf(P.LTS,0),'cm',true],['Design speed',nf(R.V,1),'m/s',true],['Static temperature',nf(P.T,1),'°C',true],['Mach · Re (side)',nf(R.M,3),'Re '+ne(R.Re,2),true],
     ['Volume flow Q',nf(R.Q,2),'m³/s · '+ni(R.Q*3600)+' m³/h'],['Mass flow',nf(R.mdot,2),'kg/s'],['Dynamic pressure q',nf(R.q_TS,0),'Pa'],['Air density ρ',nf(R.rho,3),'kg/m³'],
-    ['Circuit Δp',nf(R.dp_top,0),'Pa · K '+nf(R.K_top,3)],['Fan selection Δp',nf(R.dp_top*P.marg,0),'Pa · ×'+nf(P.marg,2)],['Fan shaft power',kW(R.P_mil).v,kW(R.P_mil).u+' · el. '+kW(R.P_elek).v+' '+kW(R.P_elek).u],['Cooling (selected)',kW(TB.sec).v,kW(TB.sec).u+(TB.secBy==='iced'?' · iced point':' · ×'+nf(P.tmarg,2))],
+    ['Circuit Δp',nf(R.dp_top,0),'Pa · K '+nf(R.K_top,3)],['Fan selection Δp',nf(R.dp_top*P.marg,0),'Pa · ×'+nf(P.marg,2)],['Fan shaft power',kW(R.P_mil).v,kW(R.P_mil).u+' · el. '+kW(R.P_elek).v+' '+kW(R.P_elek).u],['Cooling (selected)',kW(TB.sec).v,kW(TB.sec).u+' · '+nf(P.tmarg,2)+' × '+(TB.secBy==='iced'?'iced load':'clean load')],
     ['Energy ratio ER',nf(R.ER,2),'P_jet/P_air'],['Contraction ratio',nf(P.CR,2),'settling '+nf(R.geo.s_dn*100,0)+' cm'],['Footprint',nf(R.geo.boy,2)+'×'+nf(R.geo.en,2),'m'],['Air volume',nf(R.hacim,1),'m³ · wall '+nf(R.A_duvar,0)+' m²']
   ],4);
   /* plan */
@@ -275,7 +275,7 @@ async function exportSheet(ST,O,prog){
       rw('Fan shaft power',nf(TB.fan/1000,2)+' kW',nf(TBs.fan/1000,2)+' kW'),rw('Motor losses'+(P.motorIn?' (motor in the stream)':' (outside)'),nf(TB.motor/1000,2)+' kW',nf(TBs.motor/1000,2)+' kW'),
       rw('Wall heat gain (lab '+nf(P.Tlab,0)+' °C, U '+nf(TB.U,3)+' W/m²K, '+nf(R.A_duvar,1)+' m²)',nf(TB.duvar/1000,2)+' kW',nf(TBs.duvar/1000,2)+' kW'),
       rw('Spray water, sensible + latent ('+nf(TB.m_su*3600,1)+' kg/h)',nf(TB.sprey/1000,2)+' kW',nf(TBs.sprey/1000,2)+' kW'),
-      Object.assign(rw('Total, clean circuit',nf(TB.top/1000,2)+' kW',nf(TBs.top/1000,2)+' kW'),{b:true}),rw('Clean × '+nf(P.tmarg,2)+' margin',nf(TB.top*P.tmarg/1000,2)+' kW',nf(TBs.top*P.tmarg/1000,2)+' kW'),rw('Iced point: fan heat × λ_fan '+nf(P.lamF,1)+' + walls + spray',nf(TB.iced/1000,2)+' kW',nf(TBs.iced/1000,2)+' kW'),Object.assign(rw('Refrigeration selection = larger of the two',nf(TB.sec/1000,2)+' kW',nf(TBs.sec/1000,2)+' kW'),{b:true,hl:true})]);
+      Object.assign(rw('Total, clean circuit',nf(TB.top/1000,2)+' kW',nf(TBs.top/1000,2)+' kW'),{b:true}),rw('Iced point: fan heat × λ_fan '+nf(P.lamF,1)+' + walls + spray',nf(TB.iced/1000,2)+' kW',nf(TBs.iced/1000,2)+' kW'),Object.assign(rw('Refrigeration selection = '+nf(P.tmarg,2)+' × larger of the two',nf(TB.sec/1000,2)+' kW',nf(TBs.sec/1000,2)+' kW'),{b:true,hl:true})]);
     /* stacked bar */
     need(14); const parts=[['fan',C.k.fan],['motor',C.k.model],['duvar',C.k.duct],['sprey',C.k.hx]], mx=Math.max(TB.sec,TBs.sec);
     [[TB,'S2 design'],[TBs,'S1']].forEach(([t,l])=>{ let x=M+24; font(FS,'normal',6.4,C.muted); T(l,M,y+2.6); parts.forEach(p=>{ const w=t[p[0]]/mx*(W-2*M-40); doc.setFillColor(p[1]); doc.rect(x,y,w,3.6,'F'); x+=w; }); doc.setDrawColor(C.muted); doc.setLineDashPattern([0.6,0.6],0); doc.rect(x,y,(t.sec-t.top)/mx*(W-2*M-40),3.6,'S'); doc.setLineDashPattern([],0); font(FM,'normal',6.4,C.ink); T(nf(t.sec/1000,2)+' kW',W-M,y+2.8,{align:'right'}); y+=5.6; });

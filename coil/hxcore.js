@@ -114,7 +114,7 @@ function defaultG(){
 function defaults(){ return {
   T:-35,V:40,p:101325,LWC:1.0,MVD:20,dist:'tek',t_target:30,
   G:defaultG(),
-  load:{K_top:0.5267,eta_fan:0.75,eta_motor:0.91,U_wall:0.298,A_wall:81.73,T_lab:20,T_w:20,Q_extra:0},
+  load:{K_top:0.5267,eta_fan:0.75,eta_motor:0.91,U_wall:0.298,A_wall:81.73,T_lab:20,T_w:20,Q_extra:0,marj:1.30},
   lim:{dp_f_max:150e3,v_max:2.5,v_min:0.3,dp_air_max:130,depth_max:0.50,Nc_max:60,freeze_margin:3,T_evap_min:-53,no_transition:true},
   fluids:['HC-50','Dowtherm J','Therminol LT','Syltherm XLT','Syltherm XLT (CERN 1997)','Tyfoxit F50'],
   nonflam_pref:true, flam_penalty:2,
@@ -131,7 +131,7 @@ function defaults(){ return {
 function load(G){
   const y=G.load||{}, K_top=num(y.K_top,0.5267), eta_fan=num(y.eta_fan,0.75), eta_motor=num(y.eta_motor,0.91),
     U=num(y.U_wall,0.298), A=num(y.A_wall,81.73), T_lab=num(y.T_lab,20), T_w=num(y.T_w,20),
-    c_w=num(y.c_w,4183), L_f=num(y.L_f,334000), c_i=num(y.c_i,2050), Q_extra=num(y.Q_extra,0), lam=num(G.lam_fan,2.0);
+    c_w=num(y.c_w,4183), L_f=num(y.L_f,334000), c_i=num(y.c_i,2050), Q_extra=num(y.Q_extra,0), lam=num(G.lam_fan,2.0), marj=num(y.marj,1.30);
   const Y={}, warn=[], A_TS=G.TS.w*G.TS.h;
   Y.rho=G.p/(RA*(G.T+273.15)); Y.Q_air=G.V*A_TS; Y.mdot=Y.rho*Y.Q_air; Y.q_TS=0.5*Y.rho*G.V*G.V;
   Y.T0=G.T+G.V*G.V/(2*CP);
@@ -140,7 +140,9 @@ function load(G){
   if(G.T<0){ Y.Q_spray=Y.m_w*(c_w*(T_w-0)+L_f+c_i*(0-G.T)); Y.spray_parts={sens:Y.m_w*c_w*T_w,latent:Y.m_w*L_f,ice:Y.m_w*c_i*(0-G.T)}; }
   else { Y.Q_spray=Y.m_w*c_w*(T_w-G.T); Y.spray_parts={sens:Y.Q_spray,latent:0,ice:0}; warn.push('T ≥ 0 °C: the spray water does not freeze, only sensible heat is counted (not an icing condition).'); }
   Y.Q_extra=Q_extra; Y.Q_clean=Y.Q_fan+Y.Q_wall+Y.Q_spray+Q_extra; Y.Q_iced=lam*Y.Q_fan+Y.Q_wall+Y.Q_spray+Q_extra; Y.lam=lam;
-  Y.par={K_top,eta_fan,eta_motor,U_wall:U,A_wall:A,T_lab,T_w,c_w,L_f,c_i,Q_extra};
+  /* refrigeration selection, air side (kapali_devre_1D.m v1.8, yuk_modeli.m): margin on the larger of the two loads */
+  Y.marj=marj; Y.Q_sel=marj*Math.max(Y.Q_clean,Y.Q_iced);
+  Y.par={K_top,eta_fan,eta_motor,U_wall:U,A_wall:A,T_lab,T_w,c_w,L_f,c_i,Q_extra,marj};
   warn.push('K_top = '+K_top.toFixed(4)+' is taken independent of speed (Reynolds effect neglected).');
   warn.push('Atomising air of the nozzles (≈ 1.4–2.8 kW, no nozzle data yet) is not included unless entered as an extra load.');
   warn.push('Thermal bridges (flanges, supports, doors) are not included.');
@@ -542,6 +544,8 @@ function detail(r,ist,fr,fp1,ak,Xb,T0,p,mdot,Qi,Qc,dIce,scale,K){
   const dT=ist.chiller.dT_evap, dmax=Math.max(...dT);
   e.need.T_freeze_max=e.T_ch-dmax-K.freeze_margin;
   e.chiller={T_supply:e.T_ch,T_evap:dT.map(x=>e.T_ch-x),T_evap_min:e.T_ch-dmax,CO2_triple:-56.6,CO2_margin:e.T_ch-dmax+56.6,Q:R.Q_chiller,Q_clean:e.R_clean.Q_chiller};
+  /* capacity to specify (esanjor_tasarim.m e.chiller.Q_secim): margin on the iced load, pump heat as computed */
+  e.chiller.marj=num((ist.load||{}).marj,1.30); e.chiller.Q_sel=e.chiller.marj*Math.max(Qi,Qc)+num(R.P_shaft,0);
   e.why=[]; e.suitable=true; e.Tmin=ak.Tmin; e.Tmin_margin=e.T_ch-ak.Tmin;
   if(isFinite(ak.Tmin)&&e.T_ch<ak.Tmin){ e.suitable=false; e.why.push('supply '+e.T_ch.toFixed(1)+' °C below the lowest use temperature '+ak.Tmin+' °C'); }
   e.trans=hasTransition(e.R)||hasTransition(e.R_clean);
