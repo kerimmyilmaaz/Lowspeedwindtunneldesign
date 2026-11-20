@@ -6,7 +6,7 @@ Interactive one-dimensional design sheet for low-speed wind tunnels, live at
 - **Open circuit:** settling chamber, contraction, test section and diffuser sizing, loss budget, fan power,
   speed sweep and export to MATLAB (`ruzgar_tuneli_hesap.m`). Based on Barlow, Rae & Pope (1999) and
   Eckert, Mort & Jope (1976).
-- **Closed-circuit icing tunnel** (`#icing`, `kapali_devre_1D.m` v1.6): loss loop, single fan with hub fairing, iced-loss scenarios, operating cycle, thermal and icing budget,
+- **Closed-circuit icing tunnel** (`#icing`, `kapali_devre_1D.m` v1.7, scenarios S1 25 m/s and S2 40 m/s at −35 °C): loss loop, single fan with hub fairing, iced-loss scenarios, operating cycle, thermal and icing budget,
   literature-based design audit with one-click fixes, and a PDF datasheet export. The refrigeration figure is the larger of
   the clean load × margin and the iced load (fan heat at λ_fan).
 - **Coil & chiller** (`coil.html`): from the icing-test requirements (temperature, speed, LWC, MVD, run time) to a

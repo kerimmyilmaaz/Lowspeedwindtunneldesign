@@ -114,7 +114,7 @@ function defaultG(){
 function defaults(){ return {
   T:-35,V:40,p:101325,LWC:1.0,MVD:20,dist:'tek',t_target:30,
   G:defaultG(),
-  load:{K_top:0.5175,eta_fan:0.75,eta_motor:0.91,U_wall:0.298,A_wall:81.73,T_lab:20,T_w:20,Q_extra:0},
+  load:{K_top:0.5267,eta_fan:0.75,eta_motor:0.91,U_wall:0.298,A_wall:81.73,T_lab:20,T_w:20,Q_extra:0},
   lim:{dp_f_max:150e3,v_max:2.5,v_min:0.3,dp_air_max:130,depth_max:0.50,Nc_max:60,freeze_margin:3,T_evap_min:-53,no_transition:true},
   fluids:['HC-50','Dowtherm J','Therminol LT','Syltherm XLT','Syltherm XLT (CERN 1997)','Tyfoxit F50'],
   nonflam_pref:true, flam_penalty:2,
@@ -129,7 +129,7 @@ function defaults(){ return {
 
 /* ---------------- load (yuk_modeli.m) ---------------- */
 function load(G){
-  const y=G.load||{}, K_top=num(y.K_top,0.5175), eta_fan=num(y.eta_fan,0.75), eta_motor=num(y.eta_motor,0.91),
+  const y=G.load||{}, K_top=num(y.K_top,0.5267), eta_fan=num(y.eta_fan,0.75), eta_motor=num(y.eta_motor,0.91),
     U=num(y.U_wall,0.298), A=num(y.A_wall,81.73), T_lab=num(y.T_lab,20), T_w=num(y.T_w,20),
     c_w=num(y.c_w,4183), L_f=num(y.L_f,334000), c_i=num(y.c_i,2050), Q_extra=num(y.Q_extra,0), lam=num(G.lam_fan,2.0);
   const Y={}, warn=[], A_TS=G.TS.w*G.TS.h;
@@ -501,7 +501,7 @@ function design(ist,progress){
   const O=rec!==undefined?{fluid:FL[rec].name,ia:rec,X:FL[rec].best.X,e:FL[rec].best,conditional:fallback}:{fluid:'',X:null,conditional:true};
   /* K_top sensitivity */
   const DK=[];
-  if(O.X){ const Kt=Y.par.K_top; [[0.5060,'site S2 sum'],[Kt,'default'],[0.8*Kt,'−20 %'],[1.2*Kt,'+20 %']].forEach(([kv,lab])=>{
+  if(O.X){ const Kt=Y.par.K_top; [[0.5175,'matlab_v2 (50 m/s K)'],[Kt,'default'],[0.8*Kt,'−20 %'],[1.2*Kt,'+20 %']].forEach(([kv,lab])=>{
     const Gk=clone(G); Gk.load.K_top=kv; const Yk=load(Gk), q={label:lab,K_top:kv,Q_clean:Yk.Q_clean,Q_iced:Yk.Q_iced,T_ch:NaN,T_ch_clean:NaN,Re:[NaN,NaN],trans:false,P:NaN};
     try{ const Rk=rate(O.X,T0,p,mdot,Yk.Q_iced,dIce), Rt=rate(O.X,T0,p,mdot,Yk.Q_clean,0); q.T_ch=tch(Rk); q.T_ch_clean=tch(Rt); q.Re=Rk.ic.map(x=>x.Re); q.P=Rk.P_shaft; q.trans=hasTransition(Rk)||hasTransition(Rt); }catch(e){}
     DK.push(q); }); }

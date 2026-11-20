@@ -1,5 +1,5 @@
 /* Smokeline · closed-circuit icing wind tunnel · 1D engine
-   Port of kapali_devre_1D.m v1.6 (K. Yılmaz, 2026-11-06): component loss coefficients referred to the
+   Port of kapali_devre_1D.m v1.7 (K. Yılmaz, 2026-11-20; v1.7 = v1.6 with the high-speed scenario S2 at 40 m/s instead of 50 m/s): component loss coefficients referred to the
    test-section dynamic pressure, fan power and thermal budget, with
    · v1.5: equivalent cone angle tan θe = (√A2 − √A1)/(√π L) [B p.75/80, E p.xi] for every diffuser,
      shape-dependent K_e (square, round, square↔round), local flat-wall and diagonal angles of the

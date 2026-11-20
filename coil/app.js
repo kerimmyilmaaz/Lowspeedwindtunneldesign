@@ -14,8 +14,7 @@ const SCN={mevcut:'As built',k12:'Corners 1–2 heated',hepsi:'All corners heate
 const BASE=H.defaults();
 let ist=deep(BASE), T=null, sel=null, busy=false, reqId=0, view=null, iceCase='gov', xSweep='V', mxSel=null;
 const PRESETS=[
-  {k:'astral',l:'ASTRAL · 40 m/s',v:{T:-35,V:40,LWC:1,MVD:20,t_target:30}},
-  {k:'s2',l:'S2 · 50 m/s',v:{T:-35,V:50,LWC:1,MVD:20,t_target:30}},
+  {k:'s2',l:'S2 · 40 m/s',v:{T:-35,V:40,LWC:1,MVD:20,t_target:30}},
   {k:'s1',l:'S1 · 25 m/s',v:{T:-35,V:25,LWC:1,MVD:20,t_target:30}},
   {k:'glaze',l:'Glaze · −10 °C',v:{T:-10,V:40,LWC:2,MVD:30,t_target:20}}
 ];

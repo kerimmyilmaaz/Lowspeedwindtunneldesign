@@ -42,7 +42,7 @@ const GROUPS=[
 ];
 const F=(k,g,label,unit,def,m,o)=>Object.assign({k,g,label,unit,def,m},o||{});
 const FIELDS=[
- F('V','op','Design test speed (S2)','m/s',50,'G.V_tasarim'),
+ F('V','op','Design test speed (S2)','m/s',40,'G.V_tasarim'),
  F('T','op','Static temperature','°C',-35,'G.T_statik_C',{neg:true}),
  F('p','op','Static pressure','Pa',101325,'G.p_statik'),
  F('LWC','op','Liquid water content','g/m³',1.0,'G.LWC_tasarim',{zero:true}),
@@ -171,7 +171,7 @@ function validate(p){
 }
 
 /* ================= state ================= */
-const LS='smokeline.icing.v2';   /* v2: kapali_devre_1D.m v1.6 inputs (single round fan, −35 °C); v1 values are not carried over */
+const LS='smokeline.icing.v3';   /* v3: kapali_devre_1D.m v1.7 inputs (S2 = 40 m/s, S1 = 25 m/s, −35 °C); older saved values are not carried over */
 let P=defaults();
 try{ const s=JSON.parse(localStorage.getItem(LS)||'null'); if(s&&typeof s==='object') for(const k in P) if(k in s) P[k]=s[k]; }catch(_){}
 function save(){ try{ localStorage.setItem(LS,JSON.stringify(P)); }catch(_){} }
