@@ -233,7 +233,7 @@ function thermal(R,G,LWC,h){
   o.top=o.fan+o.motor+o.duvar+o.sprey;
   /* The coil must also remove the fan heat when ice has pushed the loss up to λ_fan (the fan is specified to hold the
      speed there), so the refrigeration selection is the larger of the clean load × margin and the iced load
-     (correction of 11–12 Nov 2026; the Coil & Chiller page sizes the chiller the same way). */
+     (correction of 11–12 Nov 2026; same rule as isil_butce in kapali_devre_1D.m v1.7 and the Coil & Chiller page). */
   o.iced=G.buz.lamF*(o.fan+o.motor)+o.duvar+o.sprey; o.sec=Math.max(o.top*G.tmarg,o.iced); o.secBy=o.iced>o.top*G.tmarg?'iced':'margin';
   return o;
 }
