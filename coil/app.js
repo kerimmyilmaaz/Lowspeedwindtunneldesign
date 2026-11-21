@@ -172,7 +172,7 @@ function render3D(){
 function scrubSetup(){
   const c=iceCell(), tend=Math.max(45,Math.ceil(1.5*ist.t_target)), inp=$('#iceT'), tr=$('#scrubTr');
   tr.querySelectorAll('.mk').forEach(x=>x.remove());
-  let nmk=0; const mk=(t,l)=>{ if(!isFinite(t)||t>tend) return; const d=document.createElement('i'); d.className='mk'+(nmk++%2?' lo':''); d.dataset.l=l; d.style.left=(100*t/tend)+'%'; tr.appendChild(d); };
+  let nmk=0; const mk=(t,l)=>{ if(!isFinite(t)||t>tend) return; const d=document.createElement('i'); d.className='mk'+(nmk++%2?' lo':'')+(t/tend>0.6?' r':''); d.dataset.l=l; d.style.left=(100*t/tend)+'%'; tr.appendChild(d); };
   mk(ist.t_target,'target '+ist.t_target);
   if(c) mk(c.t_clog,'front closes');
   inp.dataset.tend=tend; upScrub();
@@ -340,6 +340,7 @@ function renderLoad(){
     ['extra','Extra',Y.Q_extra,Y.Q_extra],['pump','Pump heat',pc,pi]];
   const tc=parts.reduce((s,p)=>s+p[2],0), ti=parts.reduce((s,p)=>s+p[3],0), mx=Math.max(ti,tc,1);
   const bar=(k)=>'<div class="lbar" style="width:'+(100*(k===2?tc:ti)/mx)+'%">'+parts.map(p=>{ const v=p[k], w=100*v/(k===2?tc:ti||1); return v>0?'<i style="width:'+w+'%;background:'+LC[p[0]]+'" title="'+p[1]+': '+kW(v)+' kW">'+(w>9?'<span>'+kW(v)+'</span>':'')+'</i>':''; }).join('')+'</div>';
+  requestAnimationFrame(fitL); setTimeout(fitL,500);
   $('#lPoint').textContent=f(ist.T,0)+' °C · '+f(ist.V,0)+' m/s · LWC '+f(ist.LWC,2);
   $('#lbars').innerHTML='<div class="lrow"><span class="nm">Clean</span>'+bar(2)+'<span class="tt">'+kW(tc)+' kW</span></div>'+
     '<div class="lrow"><span class="nm">Iced · λ '+f(Y.lam,1)+'</span>'+bar(3)+'<span class="tt">'+kW(ti)+' kW</span></div>'+
@@ -423,12 +424,19 @@ function renderScatter(){
   $('#scN').textContent=f(P.length,0)+' feasible of '+f(T.cand.n_eval,0)+' rated';
 }
 
+/* bar labels: shorten or hide a label that does not fit its segment (re-run on resize) */
+function fitL(){ document.querySelectorAll('#lbars .lbar i span').forEach(sp=>{ sp.style.visibility=''; sp.style.visibility=sp.offsetWidth+10>sp.parentElement.offsetWidth?'hidden':''; }); }
+function fitF(){ document.querySelectorAll('#flowbar i span').forEach(sp=>{ const nm=sp.querySelector('b'), room=sp.parentElement.offsetWidth-8; sp.style.visibility=''; nm.style.display=''; nm.textContent=nm.dataset.f||(nm.dataset.f=nm.textContent);
+    if(sp.offsetWidth>room) nm.textContent=sp.dataset.s; if(sp.offsetWidth>room) nm.style.display='none'; if(sp.offsetWidth>room) sp.style.visibility='hidden'; }); }
+let fitT; window.addEventListener('resize',()=>{ clearTimeout(fitT); fitT=setTimeout(()=>{ fitL(); fitF(); },150); });
+
 /* ---------------- ice ---------------- */
 function renderIce(){
   const B=T&&(T.ice2||T.ice); if(!B){ $('#flowbar').innerHTML=''; $('#mx').innerHTML=''; return; }
   const c=mxSel!=null?B.cells[mxSel]:B.cells[B.inom], cols=['#AD1F55','#6E4FC0','#3A5C8F','#9AA8B5','#0A779E','#1C7A51','#1E9BE0'];
   $('#fbLab').textContent=SCN[c.scen]+' · MVD '+c.MVD+' µm · '+(ist.dist==='tek'?'single size':'Langmuir D');
-  $('#flowbar').innerHTML=c.budget.map((b,i)=>{ const w=100*b.share; return w>0.05?'<i style="width:'+w+'%;background:'+(b.name==='Coil (rest)'?'#C2410C':cols[i%cols.length])+'" title="'+esc(b.name)+': '+f(w,1)+' %">'+(w>6?'<span>'+esc(b.name.replace(' (rest)',''))+'<em>'+f(w,1)+' %</em></span>':'')+'</i>':''; }).join('');
+  $('#flowbar').innerHTML=c.budget.map((b,i)=>{ const w=100*b.share; return w>0.05?'<i style="width:'+w+'%;background:'+(b.name==='Coil (rest)'?'#C2410C':cols[i%cols.length])+'" title="'+esc(b.name)+': '+f(w,1)+' %">'+(w>6?'<span data-s="'+esc(b.name.replace(' (rest)','').replace(/^Corner (\d)/,'C$1'))+'"><b>'+esc(b.name.replace(' (rest)',''))+'</b><em>'+f(w,1)+' %</em></span>':'')+'</i>':''; }).join('');
+  requestAnimationFrame(fitF); setTimeout(fitF,550);
   $('#fbNote').innerHTML='Of '+f(B.m_w*1e3,1)+' g/s sprayed, '+f(100*c.f_hx,1)+' % reaches the coil. Heated corners catch nothing; the fan is taken as transparent (not modelled). Click a cell of the matrix to see its budget.';
   const sc=B.scen, mv=B.MVDs;
   $('#mx').style.gridTemplateColumns='64px repeat('+sc.length+',1fr)';
